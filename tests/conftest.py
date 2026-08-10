@@ -59,9 +59,37 @@ def gaussian_trials(
     return generator(offset).normal(per_period_sharpe * vol, vol, (n_trials, n))
 
 
+def exact_sharpe_returns(
+    annual_sharpe: float,
+    *,
+    offset: int,
+    n: int = N_DAYS,
+    vol: float = DAILY_VOL,
+) -> np.ndarray:
+    """Returns whose **realised** annualised Sharpe is exactly ``annual_sharpe``.
+
+    ``gaussian_returns`` plants a Sharpe in the *population*; what comes back in
+    any single draw can be wildly different — a planted 0.5 has realised -0.11 at
+    one of the seeds used here. That randomness is the subject of this project, but
+    it makes a poor foundation for a test that needs to know the input Sharpe.
+
+    Standardising the draw to zero mean and unit sample standard deviation, then
+    rescaling, fixes the realised moments exactly while keeping a realistic shape.
+    """
+    z = generator(offset).standard_normal(n)
+    z = (z - z.mean()) / z.std(ddof=1)
+    return vol * z + (annual_sharpe / np.sqrt(252)) * vol
+
+
 @pytest.fixture
 def rng() -> np.random.Generator:
     return generator(0)
+
+
+@pytest.fixture
+def make_exact_returns() -> Callable[..., np.ndarray]:
+    """Factory fixture: returns with an exactly known realised Sharpe ratio."""
+    return exact_sharpe_returns
 
 
 @pytest.fixture

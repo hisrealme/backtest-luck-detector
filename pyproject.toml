@@ -77,7 +77,12 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "RUF", "NPY"]
-ignore = ["N803", "N806"]  # allow maths-style variable names (T, N, SR)
+ignore = [
+    "N803",   # allow maths-style argument names (T, N, SR)
+    "N806",   # ...and the same inside function bodies
+    "RUF002", # en dashes are correct in "Euler-Mascheroni", "Benjamini-Hochberg" etc.
+    "RUF003",
+]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["B011"]

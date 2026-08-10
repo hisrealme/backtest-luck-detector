@@ -20,6 +20,24 @@ Three failure modes get conflated in practice. This tool separates them:
 | **Selection bias** | Would the best of N random strategies have looked this good anyway? | Deflated Sharpe Ratio, White's Reality Check, Hansen's SPA, Harvey–Liu haircut |
 | **Overfitting** | Does the parameter set that won in-sample survive out-of-sample? | Probability of Backtest Overfitting via CSCV |
 
+## What it does, in one example
+
+Generate 200 strategies. Give **none** of them any edge whatsoever — pure noise, five
+years of daily data each. Keep the best one, as any backtester would:
+
+```
+Winner's annualised Sharpe   : 1.117
+Naive PSR (vs zero)          : 0.9936   <- "significant at 99%!"
+Effective independent trials : 200 of 200
+Expected max Sharpe of noise : 1.339
+Deflated Sharpe Ratio        : 0.3102   <- verdict: LUCK
+```
+
+A Sharpe of 1.12 with a 99.4% probabilistic Sharpe ratio would pass most screens.
+But the best of 200 coin-flippers should score around 1.34, so 1.12 is not merely
+unimpressive — it is *below* what pure chance predicts. The deflated ratio says
+there is a 31% chance the edge is real, and 31% is not a business.
+
 ## Status
 
 🚧 Under active construction. See [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md) for the full
@@ -27,7 +45,7 @@ Three failure modes get conflated in practice. This tool separates them:
 
 - [x] Phase 0 — repo scaffolding, CI, lint/type gates
 - [x] Phase 1 — core data model, loaders, return moments
-- [ ] Phase 2 — PSR / DSR / MinTRL
+- [x] Phase 2 — PSR / DSR / MinTRL
 - [ ] Phase 3 — bootstrap engine
 - [ ] Phase 4 — strategy mining engine
 - [ ] Phase 5 — PBO via CSCV
@@ -53,10 +71,29 @@ make check            # lint + typecheck + tests
 
 ```python
 import numpy as np
-from luckdetector import ReturnSeries, summarize
+from luckdetector import ReturnSeries, TrialMatrix, summarize
+from luckdetector.stats import (
+    deflated_sharpe_ratio,
+    deflated_sharpe_ratio_from_trials,
+    min_track_record_length,
+    probabilistic_sharpe_ratio,
+)
 
 returns = ReturnSeries(np.random.default_rng(0).normal(0.0005, 0.01, 1260))
-print(summarize(returns))
+
+summarize(returns)                                    # descriptive statistics
+probabilistic_sharpe_ratio(returns)                   # is the record long enough?
+min_track_record_length(returns) / 252                # ...if not, how long?
+deflated_sharpe_ratio(returns, n_trials=200)          # would 200 coin flips beat it?
+```
+
+If you kept every variant you tried — and you should — hand over the whole family
+and let the tool measure the trial count and their correlation itself:
+
+```python
+trials = TrialMatrix(all_my_backtests, periods_per_year=252)
+result = deflated_sharpe_ratio_from_trials(trials)
+print(result.interpretation)
 ```
 
 From the command line:
