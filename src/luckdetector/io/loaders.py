@@ -88,7 +88,12 @@ def _handle_nans(frame: pd.DataFrame, nan_policy: NanPolicy, source: str) -> pd.
             f"{source} contains {n_nan} missing value(s). Fix the data, or pass "
             'nan_policy="drop" if dropping those rows is genuinely correct.'
         )
-    return frame.dropna()
+    # Annotated local rather than a bare return: pandas-stubs 3.x types ``dropna``
+    # as returning Any, which trips mypy's no-any-return under --strict. A cast()
+    # would be flagged as redundant by the 2.x stubs, so this is the form that
+    # satisfies both.
+    cleaned: pd.DataFrame = frame.dropna()
+    return cleaned
 
 
 def _read_table(path: str | Path, date_column: str | None) -> pd.DataFrame:

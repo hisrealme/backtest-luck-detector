@@ -32,3 +32,6 @@ docs/figures/*.png
 .DS_Store
 .idea/
 .vscode/
+
+# CI artefacts downloaded for debugging
+logs_*.zip
