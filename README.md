@@ -22,21 +22,29 @@ Three failure modes get conflated in practice. This tool separates them:
 
 ## What it does, in one example
 
-Generate 200 strategies. Give **none** of them any edge whatsoever — pure noise, five
-years of daily data each. Keep the best one, as any backtester would:
+Mine 157 moving-average, momentum, RSI and breakout variants over fifteen years of
+daily prices. Keep the best one, exactly as any backtester would:
 
 ```
-Winner's annualised Sharpe   : 1.117
-Naive PSR (vs zero)          : 0.9936   <- "significant at 99%!"
-Effective independent trials : 200 of 200
-Expected max Sharpe of noise : 1.339
-Deflated Sharpe Ratio        : 0.3102   <- verdict: LUCK
+WINNER: MA(60,300)
+  Annualised Sharpe          : 0.600      (buy-and-hold managed 0.182)
+  Total return               : 493.9%
+  Max drawdown               : -37.5%
+  Naive PSR vs zero          : 0.9908     <- "significant at 99%!"
+
+  Trials run / effective     : 157 / 7
+  Expected max Sharpe, noise : 0.327
+  DEFLATED SHARPE RATIO      : 0.8585     <- verdict: LUCK
 ```
 
-A Sharpe of 1.12 with a 99.4% probabilistic Sharpe ratio would pass most screens.
-But the best of 200 coin-flippers should score around 1.34, so 1.12 is not merely
-unimpressive — it is *below* what pure chance predicts. The deflated ratio says
-there is a 31% chance the edge is real, and 31% is not a business.
+A 0.60 Sharpe that triples buy-and-hold, nearly 500% cumulative, significant at 99%.
+It would clear most screens. But once you account for having tried 157 variants — which
+cluster into roughly 7 genuinely independent bets — the honest hurdle is 0.327, and the
+probability the edge is real drops to 86%. Below the 95% bar, and 86% is not a business.
+
+The same machinery run on 200 strategies with *literally zero* edge planted in any of
+them returns a deflated ratio of 0.31, correctly refusing to be impressed by a winner
+that posted a 1.12 Sharpe.
 
 ## Status
 
@@ -47,7 +55,7 @@ there is a 31% chance the edge is real, and 31% is not a business.
 - [x] Phase 1 — core data model, loaders, return moments
 - [x] Phase 2 — PSR / DSR / MinTRL
 - [x] Phase 3 — bootstrap engine
-- [ ] Phase 4 — strategy mining engine
+- [x] Phase 4 — strategy mining engine
 - [ ] Phase 5 — PBO via CSCV
 - [ ] Phase 6 — Reality Check / SPA
 - [ ] Phase 7 — Harvey–Liu haircut
@@ -95,6 +103,19 @@ trials = TrialMatrix(all_my_backtests, periods_per_year=252)
 result = deflated_sharpe_ratio_from_trials(trials)
 print(result.interpretation)
 ```
+
+Or mine a grid yourself and watch it get indicted:
+
+```python
+from luckdetector.mining import mine, synthetic_prices
+
+result = mine(synthetic_prices(3780, seed=42), cost_bps=1.0)   # 157 variants, 15 years
+print(deflated_sharpe_ratio_from_trials(result.trials).interpretation)
+```
+
+`synthetic_prices` is exactly what it says: a GARCH-like path with realistic
+volatility clustering. Nothing here ships fabricated market data dressed up as real
+prices. Point `mine()` at your own price series to judge your own backtests.
 
 From the command line:
 
