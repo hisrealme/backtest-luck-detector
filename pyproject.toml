@@ -1,0 +1,94 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "backtest-luck-detector"
+version = "0.1.0"
+description = "Detect how much of a backtest's performance is luck, selection bias, or overfitting."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "hisrealme" }]
+keywords = ["quant", "backtesting", "overfitting", "sharpe-ratio", "statistics"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "scipy>=1.10",
+    "matplotlib>=3.7",
+    "jinja2>=3.1",
+    "typer>=0.12",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+data = ["yfinance>=0.2.40", "pyarrow>=14.0"]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "hypothesis>=6.100",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "pandas-stubs",
+    "types-requests",
+]
+
+[project.scripts]
+luckdet = "luckdetector.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/hisrealme/backtest-luck-detector"
+Issues = "https://github.com/hisrealme/backtest-luck-detector/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/luckdetector"]
+
+# ---------------------------------------------------------------- tooling ---
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "src"]
+addopts = "-q --strict-markers --doctest-modules"
+markers = [
+    "slow: long-running statistical validation (deselect with '-m \"not slow\"')",
+    "network: requires internet access",
+]
+
+[tool.coverage.run]
+source = ["src/luckdetector"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "RUF", "NPY"]
+ignore = ["N803", "N806"]  # allow maths-style variable names (T, N, SR)
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B011"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src/luckdetector"]
+strict = true
+warn_unreachable = true
+disallow_untyped_decorators = false
+
+[[tool.mypy.overrides]]
+module = ["scipy.*", "matplotlib.*", "yfinance.*"]
+ignore_missing_imports = true
