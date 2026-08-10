@@ -134,6 +134,13 @@ class TestDrawdownAndReturns:
             noise_returns
         )
 
+    def test_geometric_mean_undefined_after_total_loss(self) -> None:
+        with pytest.raises(DegenerateSeriesError, match="geometric"):
+            moments.mean_return(ReturnSeries([-1.0, 0.5]), geometric=True)
+
+    def test_geometric_annualisation_compounds(self) -> None:
+        assert moments.annualize_return(0.01, 12, geometric=True) == pytest.approx(1.01**12 - 1)
+
     def test_annualised_volatility(self, noise_returns: ReturnSeries) -> None:
         assert moments.volatility(noise_returns, annualized=True) == pytest.approx(
             0.01 * math.sqrt(252), rel=0.1

@@ -35,7 +35,7 @@ Three failure modes get conflated in practice. This tool separates them:
 - [ ] Phase 7 — Harvey–Liu haircut
 - [ ] Phase 8 — verdict aggregation
 - [ ] Phase 9 — plots + HTML report
-- [ ] Phase 10 — CLI
+- [ ] Phase 10 — CLI *(`luckdet version` and `luckdet summary` work today; `report` / `mine` / `demo` pending)*
 - [ ] Phase 11 — statistical validation suite
 - [ ] Phase 12 — docs and release
 
@@ -57,6 +57,12 @@ from luckdetector import ReturnSeries, summarize
 
 returns = ReturnSeries(np.random.default_rng(0).normal(0.0005, 0.01, 1260))
 print(summarize(returns))
+```
+
+From the command line:
+
+```bash
+luckdet summary returns.csv --date-column date
 ```
 
 Loading from disk:

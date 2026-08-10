@@ -81,6 +81,8 @@ ignore = ["N803", "N806"]  # allow maths-style variable names (T, N, SR)
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["B011"]
+# typer's declarative API *requires* calls in argument defaults; B008 is wrong here.
+"src/luckdetector/cli.py" = ["B008"]
 
 [tool.mypy]
 python_version = "3.10"

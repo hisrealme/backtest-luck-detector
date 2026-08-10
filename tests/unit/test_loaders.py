@@ -48,6 +48,11 @@ class TestFrequencyInference:
         index = pd.bdate_range("2020-01-01", periods=100).delete([10, 11, 40])
         assert loaders.infer_periods_per_year(index) == 252
 
+    def test_rejects_spacing_coarser_than_annual(self) -> None:
+        index = pd.DatetimeIndex(["2000-01-01", "2005-01-01", "2010-01-01"])
+        with pytest.raises(DataValidationError, match="coarser than annual"):
+            loaders.infer_periods_per_year(index)
+
     def test_needs_enough_timestamps(self) -> None:
         with pytest.raises(DataValidationError, match="at least 3"):
             loaders.infer_periods_per_year(pd.DatetimeIndex(["2020-01-01", "2020-01-02"]))
@@ -69,6 +74,14 @@ class TestPricesToReturns:
     def test_rejects_non_positive_prices(self) -> None:
         with pytest.raises(DataValidationError, match="non-positive"):
             loaders.returns_from_prices(np.array([100.0, 0.0, 90.0]))
+
+    def test_two_dimensional_prices_convert_column_wise(self) -> None:
+        prices = np.array([[100.0, 50.0], [110.0, 45.0]])
+        np.testing.assert_allclose(loaders.returns_from_prices(prices), [[0.10, -0.10]])
+
+    def test_rejects_three_dimensional_input(self) -> None:
+        with pytest.raises(DataValidationError, match="1-D or 2-D"):
+            loaders.returns_from_prices(np.ones((2, 2, 2)))
 
 
 class TestLoadReturns:

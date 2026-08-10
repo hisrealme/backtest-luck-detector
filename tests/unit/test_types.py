@@ -88,6 +88,19 @@ class TestTrialMatrix:
         with pytest.raises(InsufficientDataError, match="at least 2 trials"):
             TrialMatrix(np.zeros((1, 100)))
 
+    def test_rejects_too_few_periods(self) -> None:
+        with pytest.raises(InsufficientDataError, match="at least 2 periods"):
+            TrialMatrix(np.zeros((5, 1)))
+
+    def test_rejects_returns_below_minus_one(self) -> None:
+        values = np.zeros((3, 10))
+        values[1, 4] = -1.5
+        with pytest.raises(DataValidationError, match="below -100%"):
+            TrialMatrix(values)
+
+    def test_len_is_trial_count(self) -> None:
+        assert len(TrialMatrix(np.zeros((7, 20)))) == 7
+
     def test_rejects_label_length_mismatch(self) -> None:
         with pytest.raises(DataValidationError, match="labels"):
             TrialMatrix(np.zeros((3, 10)), labels=["a", "b"])
