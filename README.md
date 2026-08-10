@@ -67,12 +67,17 @@ that posted a 1.12 Sharpe.
 
 ## Install
 
+Requires **Python 3.10 or later**. macOS ships 3.9, which is end-of-life — check with
+`python3 --version` and install a current build from
+[python.org](https://www.python.org/downloads/) if needed.
+
 ```bash
 git clone https://github.com/hisrealme/backtest-luck-detector.git
 cd backtest-luck-detector
-python -m venv .venv && source .venv/bin/activate
-make install          # pip install -e ".[dev,data]"
-make check            # lint + typecheck + tests
+python3 -m venv .venv && source .venv/bin/activate
+python3 -m pip install --upgrade pip     # editable installs need pip >= 21.3
+make install                             # pip install -e ".[dev,data]"
+make check                               # lint + typecheck + tests
 ```
 
 ## Usage (current)
