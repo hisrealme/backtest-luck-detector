@@ -20,31 +20,60 @@ Three failure modes get conflated in practice. This tool separates them:
 | **Selection bias** | Would the best of N random strategies have looked this good anyway? | Deflated Sharpe Ratio, White's Reality Check, Hansen's SPA, Harvey–Liu haircut |
 | **Overfitting** | Does the parameter set that won in-sample survive out-of-sample? | Probability of Backtest Overfitting via CSCV |
 
-## What it does, in one example
+## What it does, on real data
 
-Mine 157 moving-average, momentum, RSI and breakout variants over fifteen years of
-daily prices. Keep the best one, exactly as any backtester would:
+Mine 157 moving-average, momentum, RSI and breakout variants over **SPY, 2010-01-04
+to 2026-08-07** — 4,174 trading days. Keep the best one, exactly as any backtester
+would.
 
 ```
-WINNER: MA(60,300)
-  Annualised Sharpe          : 0.600      (buy-and-hold managed 0.182)
-  Total return               : 493.9%
-  Max drawdown               : -37.5%
-  Naive PSR vs zero          : 0.9908     <- "significant at 99%!"
+$ luckdet mine SPY --start 2010-01-01
 
-  Trials run / effective     : 157 / 7
-  Expected max Sharpe, noise : 0.327
-  DEFLATED SHARPE RATIO      : 0.8585     <- verdict: LUCK
+SPY, 2010-01-04 to 2026-08-07 (cache)
+Mined 157 strategies; buy-and-hold Sharpe 0.867
+
+           Winner: MA(80,250)
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┓
+┃ Statistic                    ┃  Value ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━┩
+│ Annualised Sharpe            │  0.491 │
+│ Total return                 │ 205.6% │
+│ Max drawdown                 │ -40.3% │
+│ Naive PSR vs zero            │ 0.9764 │
+│ Trials run                   │    157 │
+│ Effectively independent      │     12 │
+│ Expected max Sharpe of noise │  0.309 │
+│ Deflated Sharpe Ratio        │ 0.7692 │
+└──────────────────────────────┴────────┘
+VERDICT: likely luck
 ```
 
-A 0.60 Sharpe that triples buy-and-hold, nearly 500% cumulative, significant at 99%.
-It would clear most screens. But once you account for having tried 157 variants — which
-cluster into roughly 7 genuinely independent bets — the honest hurdle is 0.327, and the
-probability the edge is real drops to 86%. Below the 95% bar, and 86% is not a business.
+Two findings, and the second is the one that matters.
 
-The same machinery run on 200 strategies with *literally zero* edge planted in any of
-them returns a deflated ratio of 0.31, correctly refusing to be impressed by a winner
-that posted a 1.12 Sharpe.
+**The winner fails deflation.** A Sharpe of 0.491 with a 97.6% probabilistic Sharpe
+ratio looks significant. But 157 variants cluster into ~12 independent bets, the best
+of pure noise would be expected to score 0.309 anyway, and the honest probability the
+edge is real is 76.9% — under the 95% bar.
+
+**Not one of the 157 beat buy-and-hold.** Zero. Buy-and-hold returned 814.3% at a
+Sharpe of 0.867 with a *smaller* drawdown (-33.7% against the winner's -40.3%). The
+winner's return stream minus buy-and-hold's has an annualised Sharpe of **-0.416**.
+The entire exercise destroyed value, and 26 of the variants (17%) posted a negative
+Sharpe outright.
+
+That is the whole thesis in one table. A backtester who reported only MA(80,250) would
+show you 205% cumulative and a significant t-statistic, while quietly having lost to
+doing nothing at all for sixteen years.
+
+<sub>**Caveat, stated because it matters:** 2010–2026 was a historic bull market, and
+trend rules that go flat or short necessarily give up ground in a relentless uptrend.
+This is evidence about *this* strategy family over *this* period, not a universal claim
+about trend following. Run `luckdet mine` on your own symbol and window — the tool has
+no stake in the answer.</sub>
+
+Run against 200 strategies with *literally zero* edge planted in any of them, the same
+machinery returns a deflated ratio of 0.31, correctly refusing to be impressed by a
+winner that posted a 1.12 Sharpe.
 
 ## Status
 
