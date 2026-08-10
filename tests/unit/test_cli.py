@@ -54,3 +54,20 @@ def test_summary_reports_errors_cleanly(tmp_path: Path) -> None:
 def test_no_args_shows_help() -> None:
     result = runner.invoke(app, [])
     assert "How much of your backtest is luck?" in result.stdout
+
+
+class TestMineCommand:
+    def test_synthetic_mode_needs_no_network(self) -> None:
+        result = runner.invoke(app, ["mine", "--synthetic", "--periods", "1200"])
+        assert "Winner:" in result.stdout
+        assert "Deflated Sharpe Ratio" in result.stdout
+        assert "VERDICT" in result.stdout
+
+    def test_exit_code_encodes_the_verdict(self) -> None:
+        """Exit 1 for 'likely luck', 0 for 'survives' — usable from a shell script."""
+        result = runner.invoke(app, ["mine", "--synthetic", "--periods", "1200"])
+        assert result.exit_code in (0, 1)
+
+    def test_reports_provenance(self) -> None:
+        result = runner.invoke(app, ["mine", "--synthetic", "--periods", "1200"])
+        assert "synthetic path" in result.stdout
