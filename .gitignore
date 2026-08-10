@@ -35,3 +35,20 @@ docs/figures/*.png
 
 # CI artefacts downloaded for debugging
 logs_*.zip
+
+# Credentials — nothing here today, and this is how it stays that way.
+# A paid market-data provider is the obvious future reason to hold a key, and
+# the moment to add these rules is before that key exists, not after.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+secrets.json
+credentials.json
+.netrc
+*.credentials

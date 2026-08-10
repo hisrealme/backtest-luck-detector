@@ -5,6 +5,13 @@ on:
     branches: [main]
   pull_request:
 
+# Least privilege: this workflow only reads the repository. Without an explicit
+# block the job inherits whatever the repository default is, which on older repos
+# is read/write — meaning a compromised dependency could push commits using the
+# automatic GITHUB_TOKEN.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
