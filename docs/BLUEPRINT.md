@@ -260,6 +260,30 @@ Each phase ends with green tests and one commit. Nothing moves forward on red.
 | 11 | **Validation suite** | `tests/validation/` | Every test calibrated: size ≈ nominal under null, documented power curves |
 | 12 | Docs + publish | README, METHODS, notebook | Repo is legible to a stranger in 60 seconds; v0.1.0 tagged and pushed |
 
+## 6a. Animation layer (amendment, Phase 9)
+
+Static matplotlib figures go in the HTML report. Separately, a **manim** explainer
+covers the ideas that prose handles badly. Decisions taken:
+
+* **ManimCommunity** (`pip install manim`), not ManimGL. Stable API, real docs,
+  Cairo renderer with no OpenGL dependency.
+* Built **at Phase 9**, once there are real results to animate.
+* Scenes: (1) best-of-N — 200 equity curves, the winner extracted, the
+  distribution of maxima assembling beneath it; (2) CSCV block shuffling into
+  PBO; (3) the DSR hurdle climbing with N against a fixed strategy Sharpe;
+  (4) bootstrap resampling building a null distribution.
+
+**Isolation requirements — non-negotiable:**
+
+* Lives in `animations/`, *outside* the `luckdetector` package. Nothing in `src/`
+  may import manim.
+* Declared as an optional extra (`.[animation]`), never a core dependency —
+  manim pulls in ffmpeg, Pango and a LaTeX distribution.
+* Excluded from the CI matrix. A separate workflow may lint the scene files, but
+  rendering never runs in CI.
+* Rendered output committed as compressed GIF/MP4 under `docs/media/`, referenced
+  from the README. The scenes must be reproducible from a documented command.
+
 ## 7. The demo that sells the project
 
 `luckdet demo` runs this narrative end-to-end, and its output becomes the README hero:

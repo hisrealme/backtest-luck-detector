@@ -36,6 +36,7 @@ __all__ = [
     "as_return_series",
     "deannualize_sharpe",
     "excess_returns",
+    "is_effectively_constant",
     "kurtosis",
     "max_drawdown",
     "mean_return",
@@ -50,6 +51,27 @@ __all__ = [
 #: ~2e-19 rather than exactly 0.0, which would otherwise yield a Sharpe ratio of
 #: 4.6e15 — a nonsense number that propagates silently into every downstream test.
 _RELATIVE_ZERO = 1e-12
+
+
+def is_effectively_constant(
+    values: ReturnSeries | FloatArray,
+    *,
+    rtol: float = _RELATIVE_ZERO,
+) -> bool:
+    """Is this series constant to within floating-point noise?
+
+    Exact equality against zero is the wrong test. Subtracting the mean from 100
+    identical values leaves residue on the order of 1e-19, which is enough to make
+    downstream ratios and spectral estimates produce confident nonsense. Every
+    routine in this package that divides by a dispersion measure should gate on
+    this first.
+    """
+    arr = np.asarray(
+        values.values if isinstance(values, ReturnSeries) else values, dtype=np.float64
+    )
+    sd = float(np.std(arr))
+    scale = max(float(np.mean(np.abs(arr))), float(np.finfo(np.float64).tiny))
+    return not math.isfinite(sd) or sd <= rtol * scale
 
 
 def as_return_series(
@@ -148,12 +170,11 @@ def sharpe_ratio(
     series = as_return_series(data)
     excess = excess_returns(series, risk_free_rate)
     sd = float(np.std(excess, ddof=ddof))
-    scale = max(float(np.mean(np.abs(excess))), float(np.finfo(np.float64).tiny))
-    if not math.isfinite(sd) or sd <= _RELATIVE_ZERO * scale:
+    if is_effectively_constant(excess):
         raise DegenerateSeriesError(
             f"Cannot compute a Sharpe ratio for '{series.name}': the return series has "
-            f"effectively zero volatility (sd={sd:.3g} against a mean absolute return of "
-            f"{scale:.3g}). A constant return stream has no risk to adjust for."
+            f"effectively zero volatility (sd={sd:.3g}). A constant return stream has "
+            "no risk to adjust for."
         )
     sr = float(np.mean(excess)) / sd
     return annualize_sharpe(sr, series.periods_per_year) if annualized else sr

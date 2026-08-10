@@ -46,7 +46,7 @@ there is a 31% chance the edge is real, and 31% is not a business.
 - [x] Phase 0 — repo scaffolding, CI, lint/type gates
 - [x] Phase 1 — core data model, loaders, return moments
 - [x] Phase 2 — PSR / DSR / MinTRL
-- [ ] Phase 3 — bootstrap engine
+- [x] Phase 3 — bootstrap engine
 - [ ] Phase 4 — strategy mining engine
 - [ ] Phase 5 — PBO via CSCV
 - [ ] Phase 6 — Reality Check / SPA
