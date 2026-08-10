@@ -67,7 +67,8 @@ that posted a 1.12 Sharpe.
 
 ## Install
 
-Requires **Python 3.10 or later**. macOS ships 3.9, which is end-of-life — check with
+Requires **Python 3.10 or later**; tested through 3.14. macOS ships 3.9, which is
+end-of-life — check with
 `python3 --version` and install a current build from
 [python.org](https://www.python.org/downloads/) if needed.
 
