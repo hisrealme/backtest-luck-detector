@@ -274,8 +274,8 @@ environment caught, so **always run `make check` locally before pushing**.
 
 ## 6. Open items
 
-- Delete the old GitHub repo (`backtest-luck-detector-old`) — that is what actually
-  removes the pre-rename commits from GitHub's servers. **Still outstanding.**
+- ~~Delete the old GitHub repo (`backtest-luck-detector-old`)~~ — **done**. The
+  pre-rename commits are off GitHub's servers.
 - **Known gap in Phase 5:** CSCV has no purge/embargo between in-sample and
   out-of-sample blocks. With S = 16 and T = 4,173 each block is ~261 days, so a
   250-day-lookback rule is contaminated near each seam. This makes the winner look
