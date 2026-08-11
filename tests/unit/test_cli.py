@@ -183,7 +183,9 @@ class TestReportCommand:
              "--output", str(destination)],
         )
         assert result.exit_code in (0, 1), result.stdout
-        assert "Benchmark</th><td class=\"num\">zero" in destination.read_text(encoding="utf-8")
+        assert '<th>Benchmark</th><td class="n">zero</td>' in destination.read_text(
+            encoding="utf-8"
+        )
 
     def test_reports_errors_cleanly(
         self, tmp_path: Path, no_network: pytest.MonkeyPatch

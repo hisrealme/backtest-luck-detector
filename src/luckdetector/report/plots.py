@@ -57,6 +57,7 @@ import io
 from typing import Any
 
 import numpy as np
+from matplotlib import rc_context
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 from scipy import stats as sps
@@ -87,6 +88,21 @@ COLOURS: dict[str, str] = {
 
 _FIGSIZE = (9.0, 4.8)
 _DPI = 110
+
+#: Figure type is set to match the report's body text rather than matplotlib's
+#: sans-serif default, since the two sit inches apart on the page. DejaVu Serif
+#: ships with matplotlib, so this adds no font dependency and cannot render
+#: differently in CI.
+_FONT: dict[str, Any] = {
+    "font.family": "serif",
+    "font.serif": ["DejaVu Serif"],
+    "mathtext.fontset": "dejavuserif",
+    "axes.labelsize": 10,
+    "axes.titlesize": 11,
+    "legend.fontsize": 8.5,
+    "xtick.labelsize": 9,
+    "ytick.labelsize": 9,
+}
 
 
 def _new_figure(synthetic: bool) -> tuple[Any, Any]:
@@ -122,7 +138,7 @@ def _x_axis(analysis: Analysis, n: int) -> tuple[Any, str]:
     return np.arange(n), "Trading period"
 
 
-def cumulative_return_figure(analysis: Analysis) -> Any:
+def cumulative_return_figure(analysis: Analysis, *, title: bool = True) -> Any:
     """Cumulative wealth: the winner against the benchmark it was competing with.
 
     Both lines start at 1.0 and compound the same periods, so the vertical gap at
@@ -130,7 +146,17 @@ def cumulative_return_figure(analysis: Analysis) -> Any:
     sixteen-year equity curve spanning 1x to 9x compresses the early years into
     invisibility on a linear axis, and the early years are where the winner is
     ahead.
+
+    ``title=False`` drops the heading, which is what the HTML report asks for: a
+    figure printed directly above its own numbered caption should not restate the
+    caption. The default is ``True`` so the figure still stands on its own when
+    it is used outside the report.
     """
+    with rc_context(_FONT):
+        return _cumulative_return_figure(analysis, title=title)
+
+
+def _cumulative_return_figure(analysis: Analysis, *, title: bool) -> Any:
     figure, axes = _new_figure(analysis.synthetic)
 
     winner_curve = analysis.winner.cumulative()
@@ -155,7 +181,8 @@ def cumulative_return_figure(analysis: Analysis) -> Any:
     if np.all(benchmark_curve > 0.0) and np.all(winner_curve > 0.0):
         axes.set_yscale("log")
 
-    axes.set_title("Cumulative return: the reported winner against doing nothing")
+    if title:
+        axes.set_title("Cumulative return: the reported winner against doing nothing")
     axes.set_xlabel(x_label)
     axes.set_ylabel("Growth of 1.0 (log scale)")
     axes.legend(loc="upper left", frameon=False)
@@ -163,7 +190,7 @@ def cumulative_return_figure(analysis: Analysis) -> Any:
     return figure
 
 
-def trial_sharpe_figure(analysis: Analysis) -> Any:
+def trial_sharpe_figure(analysis: Analysis, *, title: bool = True) -> Any:
     """The deflation hurdle, drawn as the test applies it.
 
     See the module docstring for why this is not the figure the Phase 8 brief
@@ -181,7 +208,14 @@ def trial_sharpe_figure(analysis: Analysis) -> Any:
       winner — **the shaded area is the DSR**;
     * the winner, the expected maximum of noise, and the Sharpe the winner would
       have needed to clear 0.95.
+
+    ``title=False`` drops the heading for use directly above a numbered caption.
     """
+    with rc_context(_FONT):
+        return _trial_sharpe_figure(analysis, title=title)
+
+
+def _trial_sharpe_figure(analysis: Analysis, *, title: bool) -> Any:
     figure, axes = _new_figure(analysis.synthetic)
 
     sharpes: FloatArray = analysis.trial_sharpes
@@ -243,11 +277,12 @@ def trial_sharpe_figure(analysis: Analysis) -> Any:
         label=f"Sharpe needed for DSR {DSR_THRESHOLD:.2f}: {hurdle:.3f}",
     )
 
-    verdict = "short of" if winner < hurdle else "clear of"
-    axes.set_title(
-        f"The winner is {verdict} the bar it has to clear "
-        f"(gap {winner - hurdle:+.3f} annualised Sharpe)"
-    )
+    if title:
+        verdict = "short of" if winner < hurdle else "clear of"
+        axes.set_title(
+            f"The winner is {verdict} the bar it has to clear "
+            f"(gap {winner - hurdle:+.3f} annualised Sharpe)"
+        )
     axes.set_xlabel("Annualised Sharpe ratio")
     axes.set_ylabel("Density")
     axes.set_xlim(lo - pad, hi + pad)

@@ -21,7 +21,23 @@ Not a pass, not a failure, and emphatically not greyed out. On the SPY report th
 inapplicable row carries the strongest sentence in the whole analysis — *not one
 of the 157 strategies beat buy-and-hold* — and a template that styled it as a
 muted footnote would bury the best finding in the project under its own
-formatting. It is rendered as a callout with its own colour, above the fold.
+formatting. It gets a numbered subsection of its own like every other test, and
+its table row shows no comparison at all rather than a misleading one (§11.3).
+
+Why it is laid out as a paper
+-----------------------------
+Single column, serif, justified, numbered sections, tables ruled top-mid-bottom
+with no verticals, captions above tables and below figures, and near enough to
+monochrome. The format is borrowed from a conference paper because the document
+makes the same kind of claim: here is what was measured, here is the evidence,
+here is what would change the conclusion. A dashboard aesthetic — status
+chips, coloured cards, a big red banner — invites the reader to skim to the
+verdict and stop, which is the exact behaviour that produces a 0.9764 PSR and a
+published strategy. Paper typography is slower on purpose.
+
+Status is therefore carried by weight and small caps rather than by colour, and
+exactly one accent is used per document, tied to the verdict. The figures keep
+their own palette; everything else is black on white.
 """
 
 from __future__ import annotations
@@ -80,10 +96,13 @@ CAVEATS: tuple[tuple[str, str], ...] = (
     ),
 )
 
-_STATUS_STYLE: dict[str, tuple[str, str]] = {
-    "PASS": ("pass", "PASS"),
-    "FAIL": ("fail", "FLAGGED"),
-    "NOT_APPLICABLE": ("na", "NOT APPLICABLE"),
+#: ``css class`` → ``(short badge, prose used in the table cell)``. Status is
+#: carried by weight and small caps rather than colour; only ``flagged`` picks up
+#: the document's single accent.
+_STATUS_STYLE: dict[str, tuple[str, str, str]] = {
+    "PASS": ("pass", "passed", "passed"),
+    "FAIL": ("fail", "flagged", "flagged"),
+    "NOT_APPLICABLE": ("na", "not applicable", "not applicable"),
 }
 
 _VERDICT_STYLE: dict[str, tuple[str, str]] = {
@@ -100,137 +119,199 @@ _TEMPLATE = """<!DOCTYPE html>
 <title>{{ title }}</title>
 <style>
   :root {
-    --ink: #1c2833; --muted: #5d6d7e; --rule: #d5dbdb; --paper: #ffffff;
-    --pass: #1e8449; --fail: #c0392b; --na: #b7791f; --wash: #f4f6f7;
+    --ink: #111111; --muted: #55595e; --rule: #111111; --hair: #c9ccd0;
+    --paper: #ffffff; --desk: #e9e8e4; --accent: #7d2b2b;
   }
+  .v-skill { --accent: #1d5c38; }
+  .v-inconclusive { --accent: #7a5c14; }
   * { box-sizing: border-box; }
-  body { margin: 0; padding: 2.2rem 1.2rem 4rem; background: var(--wash); color: var(--ink);
-         font: 16px/1.62 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-               Helvetica, sans-serif; }
-  main { max-width: 980px; margin: 0 auto; background: var(--paper); padding: 2.4rem 2.6rem 3rem;
-         border: 1px solid var(--rule); border-radius: 6px; }
-  h1 { font-size: 1.85rem; margin: 0 0 .35rem; letter-spacing: -.01em; }
-  h2 { font-size: 1.18rem; margin: 2.6rem 0 .8rem; padding-bottom: .35rem;
-       border-bottom: 1px solid var(--rule); }
-  .provenance { color: var(--muted); font-size: .92rem; margin: 0 0 1.6rem; }
-  .synthetic { background: #fdebd0; border: 1px solid #d35400; color: #8c3d00;
-               padding: .9rem 1.1rem; border-radius: 4px; margin: 0 0 1.6rem;
-               font-weight: 600; letter-spacing: .02em; }
-  .banner { padding: 1.3rem 1.5rem; border-radius: 5px; margin: 0 0 1.4rem;
-            border-left: 6px solid; }
-  .banner .label { font-size: 1.5rem; font-weight: 700; letter-spacing: .01em; }
-  .banner .rule { margin-top: .35rem; color: var(--muted); font-size: .95rem; }
-  .banner.luck { background: #fdedec; border-color: var(--fail); }
-  .banner.luck .label { color: var(--fail); }
-  .banner.skill { background: #eafaf1; border-color: var(--pass); }
-  .banner.skill .label { color: var(--pass); }
-  .banner.inconclusive { background: #fef9e7; border-color: var(--na); }
-  .banner.inconclusive .label { color: var(--na); }
-  table { width: 100%; border-collapse: collapse; margin: .4rem 0 1.2rem; font-size: .95rem; }
-  th, td { text-align: left; padding: .62rem .7rem; border-bottom: 1px solid var(--rule); }
-  th { font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-  td.num { text-align: right; font-variant-numeric: tabular-nums;
-           font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .tag { display: inline-block; padding: .16rem .55rem; border-radius: 3px;
-         font-size: .74rem; font-weight: 700; letter-spacing: .05em; }
-  .tag.pass { background: #eafaf1; color: var(--pass); }
-  .tag.fail { background: #fdedec; color: var(--fail); }
-  .tag.na   { background: #fef5e7; color: var(--na); }
-  .evidence { margin: 1.4rem 0; padding: 1rem 1.2rem; border-left: 4px solid var(--rule);
-              background: #fbfcfc; border-radius: 0 4px 4px 0; }
-  .evidence.pass { border-color: var(--pass); }
-  .evidence.fail { border-color: var(--fail); }
-  .evidence.na { border-color: var(--na); background: #fffdf6; }
-  .evidence h3 { margin: 0 0 .3rem; font-size: 1rem; }
-  .evidence h3 .tag { margin-left: .5rem; vertical-align: 2px; }
-  .evidence p { margin: .35rem 0 0; }
-  .evidence.na p { font-size: 1.02rem; }
-  figure { margin: 1.6rem 0; }
-  figure img { width: 100%; height: auto; display: block; border: 1px solid var(--rule);
-               border-radius: 4px; }
-  figcaption { color: var(--muted); font-size: .88rem; margin-top: .55rem; }
-  .caveat { margin: .9rem 0; }
-  .caveat strong { display: block; }
-  .caveat span { color: var(--muted); font-size: .93rem; }
-  footer { margin-top: 2.6rem; padding-top: 1rem; border-top: 1px solid var(--rule);
-           color: var(--muted); font-size: .85rem; }
-  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; padding: 2.5rem 1rem 5rem; background: var(--desk); color: var(--ink);
+    font-family: "Libertinus Serif", "Linux Libertine O", "Palatino Linotype",
+                 Palatino, "Book Antiqua", Georgia, "Times New Roman", serif;
+    font-size: 16px; line-height: 1.52;
+  }
+  article {
+    max-width: 44rem; margin: 0 auto; background: var(--paper);
+    padding: 4.2rem 4.4rem 3.4rem; border: 1px solid var(--hair);
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  p { margin: 0 0 .72rem; text-align: justify; hyphens: auto; }
+  .runhead {
+    margin: 0 0 2.2rem; text-align: center; font-size: .7rem; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  h1 {
+    margin: 0 0 .7rem; text-align: center; font-size: 1.72rem; line-height: 1.24;
+    font-weight: 700; letter-spacing: -.005em;
+  }
+  .byline {
+    margin: 0 0 1.8rem; text-align: center; font-size: .87rem; color: var(--muted);
+  }
+  .synthetic {
+    margin: 0 0 1.7rem; padding: .55rem .8rem; text-align: center;
+    border: 1px solid var(--ink); font-size: .82rem; letter-spacing: .04em;
+  }
+  .synthetic b { font-weight: 700; letter-spacing: .12em; }
+  .abstract {
+    margin: 0 0 1.9rem; padding: 0 2.1rem; font-size: .93rem;
+  }
+  .abstract h2 {
+    margin: 0 0 .4rem; text-align: center; font-size: .8rem; letter-spacing: .14em;
+    text-transform: uppercase; font-weight: 700; border: 0; padding: 0;
+  }
+  .verdict {
+    display: block; margin: 0 0 .55rem; text-align: center;
+    font-size: 1.06rem; font-weight: 700; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--accent);
+  }
+  h2 {
+    margin: 1.9rem 0 .6rem; font-size: 1.02rem; font-weight: 700;
+    border-bottom: 1px solid var(--hair); padding-bottom: .22rem;
+  }
+  h2 .n { display: inline-block; min-width: 1.25rem; }
+  h3 { margin: 1.1rem 0 .3rem; font-size: .95rem; font-weight: 700; }
+  h3 .st {
+    font-weight: 700; font-size: .68rem; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--muted); margin-left: .5rem; vertical-align: .1em;
+  }
+  h3 .st.flagged { color: var(--accent); }
+  h3 .st.na { color: var(--ink); border-bottom: 1px solid var(--ink); }
+  table { width: 100%; border-collapse: collapse; margin: 0 0 1.3rem; font-size: .9rem; }
+  caption {
+    caption-side: top; text-align: left; font-size: .87rem; margin-bottom: .42rem;
+  }
+  caption b { font-weight: 700; }
+  thead th {
+    font-weight: 700; font-size: .72rem; letter-spacing: .09em; text-transform: uppercase;
+  }
+  th, td { padding: .3rem .5rem; text-align: left; }
+  tbody tr th { font-weight: 400; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .toprule td, .toprule th { border-top: 1.4px solid var(--rule); }
+  thead tr:last-child th { border-bottom: .7px solid var(--rule); }
+  tbody tr:last-child td, tbody tr:last-child th { border-bottom: 1.4px solid var(--rule); }
+  tr.flagged th, tr.flagged td { color: var(--accent); }
+  figure { margin: 1.4rem 0 1.5rem; }
+  figure img { display: block; width: 100%; height: auto; }
+  figcaption {
+    margin-top: .5rem; font-size: .85rem; text-align: justify; hyphens: auto;
+  }
+  figcaption b { font-weight: 700; }
+  .limit { margin: 0 0 .6rem; font-size: .9rem; }
+  .limit b { font-weight: 700; }
+  .colophon {
+    margin-top: 2.4rem; padding-top: .7rem; border-top: .7px solid var(--hair);
+    font-size: .78rem; color: var(--muted); text-align: left;
+  }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+         font-size: .88em; }
+  @media print {
+    body { background: #fff; padding: 0; font-size: 10.5pt; }
+    article { max-width: none; border: 0; box-shadow: none; padding: 0; }
+    figure, table { break-inside: avoid; }
+    h2, h3 { break-after: avoid; }
+  }
+  @media (max-width: 640px) {
+    article { padding: 2rem 1.4rem; }
+    .abstract { padding: 0; }
+  }
 </style>
 </head>
 <body>
-<main>
+<article class="v-{{ verdict_class }}">
+
+  <p class="runhead">{{ runhead }}</p>
   <h1>{{ title }}</h1>
-  <p class="provenance">{{ provenance }}</p>
+  <p class="byline">{{ provenance }}</p>
 
   {% if synthetic %}
-  <div class="synthetic">
-    SYNTHETIC DATA — every number and every figure below was computed from a generated
-    price path, not from a market. This output demonstrates the machinery; it is not a
-    result about any real instrument.
-  </div>
+  <p class="synthetic"><b>SYNTHETIC DATA</b> — generated prices, not a market. Every
+     number and figure below describes a random number generator.</p>
   {% endif %}
 
-  <div class="banner {{ verdict_class }}">
-    <div class="label">{{ label_text }}</div>
-    <div class="rule">{{ verdict_sentence }} {{ rule_sentence }}</div>
-  </div>
+  <section class="abstract">
+    <h2>Abstract</h2>
+    <span class="verdict">{{ label_text }}</span>
+    <p>{{ abstract }}</p>
+  </section>
 
-  <h2>What was tested</h2>
+  <h2><span class="n">1</span> Data and search</h2>
+  <p>{{ search_paragraph }}</p>
+
   <table>
+    <caption><b>Table 1.</b> The search, and the record it produced.</caption>
     <tbody>
       {% for label, value in facts %}
-      <tr><th>{{ label }}</th><td class="num">{{ value }}</td></tr>
+      <tr{% if loop.first %} class="toprule"{% endif %}>
+        <th>{{ label }}</th><td class="n">{{ value }}</td>
+      </tr>
       {% endfor %}
     </tbody>
   </table>
 
-  <h2>The evidence</h2>
+  <figure>
+    <img alt="Cumulative return of the winner against the benchmark"
+         src="data:image/png;base64,{{ figure_cumulative }}">
+    <figcaption><b>Figure 1.</b> {{ caption_cumulative }}</figcaption>
+  </figure>
+
+  <h2><span class="n">2</span> Evidence</h2>
+  <p>{{ evidence_paragraph }}</p>
+
   <table>
+    <caption><b>Table 2.</b> The four tests, in the order they are evaluated. A
+      flagged test is one that objected; an inapplicable one had nothing to weigh
+      and is neither evidence for nor against.</caption>
     <thead>
-      <tr><th>Test</th><th>Statistic</th><th>Threshold</th><th>Status</th></tr>
+      <tr class="toprule">
+        <th>Test</th><th class="n">Statistic</th><th class="n">Threshold</th><th>Outcome</th>
+      </tr>
     </thead>
     <tbody>
       {% for row in rows %}
-      <tr>
-        <td>{{ row.title }}</td>
-        <td class="num">{{ row.statistic }}</td>
-        <td class="num">{{ row.threshold }}</td>
-        <td><span class="tag {{ row.css }}">{{ row.badge }}</span></td>
+      <tr{% if row.css == 'fail' %} class="flagged"{% endif %}>
+        <th>{{ row.title }}</th>
+        <td class="n">{{ row.statistic }}</td>
+        <td class="n">{{ row.threshold }}</td>
+        <td>{{ row.badge_text }}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
 
   {% for row in rows %}
-  <div class="evidence {{ row.css }}">
-    <h3>{{ row.title }}<span class="tag {{ row.css }}">{{ row.badge }}</span></h3>
-    <p>{{ row.interpretation }}</p>
-  </div>
+  <h3>2.{{ loop.index }}&nbsp; {{ row.title
+      }}<span class="st {{ row.css }}">{{ row.badge }}</span></h3>
+  <p>{{ row.interpretation }}</p>
   {% endfor %}
 
-  <h2>Figures</h2>
-  <figure>
-    <img alt="Cumulative return of the winner against the benchmark"
-         src="data:image/png;base64,{{ figure_cumulative }}">
-    <figcaption>{{ caption_cumulative }}</figcaption>
-  </figure>
+  <h2><span class="n">3</span> The bar the winner had to clear</h2>
+  <p>{{ hurdle_paragraph }}</p>
+
   <figure>
     <img alt="Trial Sharpe distribution against the deflation hurdle"
          src="data:image/png;base64,{{ figure_sharpes }}">
-    <figcaption>{{ caption_sharpes }}</figcaption>
+    <figcaption><b>Figure 2.</b> {{ caption_sharpes }}</figcaption>
   </figure>
 
-  <h2>Caveats</h2>
+  <h2><span class="n">4</span> Limitations</h2>
+  <p>Each of the following is measured elsewhere in this project rather than
+     offered as a generic disclaimer.</p>
   {% for heading, body in caveats %}
-  <div class="caveat"><strong>{{ heading }}</strong><span>{{ body }}</span></div>
+  <p class="limit"><b>{{ heading }}.</b> {{ body }}</p>
   {% endfor %}
 
-  <footer>
+  <p class="colophon">
     Generated by luckdetector {{ version }}. Every number above was produced by a public
     function in <code>luckdetector.stats</code>; nothing in this document was computed by
-    the template. Method and thresholds: <code>docs/METHODS.md</code>.
-  </footer>
-</main>
+    the template. Method, thresholds and the arguments against them:
+    <code>docs/METHODS.md</code>. This file is self-contained — both figures are embedded,
+    and it uses no external stylesheet, font or script.
+  </p>
+
+</article>
 </body>
 </html>
 """
@@ -263,7 +344,7 @@ def _rows(analysis: Analysis) -> list[dict[str, str]]:
     """One row per test, in ``TEST_ORDER``, derived from nothing."""
     rows: list[dict[str, str]] = []
     for result in analysis.verdict.results:
-        css, badge = _STATUS_STYLE[result.status]
+        css, badge, badge_text = _STATUS_STYLE[result.status]
         statistic, threshold = _format_cells(result)
         rows.append(
             {
@@ -273,6 +354,7 @@ def _rows(analysis: Analysis) -> list[dict[str, str]]:
                 "threshold": threshold,
                 "css": css,
                 "badge": badge,
+                "badge_text": badge_text,
                 "interpretation": result.interpretation,
             }
         )
@@ -312,6 +394,83 @@ def _facts(analysis: Analysis) -> list[tuple[str, str]]:
     if analysis.cost_bps is not None:
         facts.append(("Transaction cost", f"{analysis.cost_bps:.1f} bp per unit turnover"))
     return facts
+
+
+def _abstract(analysis: Analysis) -> str:
+    """The verdict, restated as an abstract would state it.
+
+    Composed here rather than in the template for the same reason as everything
+    else: it quotes six numbers, and a template that formatted them would be a
+    second implementation with nothing checking it.
+    """
+    flagged = [TEST_TITLES.get(r.name, r.name) for r in analysis.verdict.flags]
+    if flagged:
+        objection = (
+            f"{_join(flagged)} objected"
+            if len(flagged) > 1
+            else f"the {flagged[0]} objected"
+        )
+    else:
+        objection = "no test objected"
+
+    beat = (
+        f"Not one of them beat {analysis.benchmark_name}"
+        if analysis.n_beating_benchmark == 0
+        else f"{analysis.n_beating_benchmark} of them beat {analysis.benchmark_name}"
+    )
+    return (
+        f"A grid of {analysis.n_trials:,} strategy variants was searched over "
+        f"{analysis.n_periods:,} periods ({analysis.years:.1f} years). The best of them, "
+        f"{analysis.winner_label}, posted an annualised Sharpe ratio of "
+        f"{analysis.winner_sharpe:.3f} and a total return of "
+        f"{analysis.winner_total_return:+.1%} — the number a backtester reporting a single "
+        f"result would have shown you. {beat}. Four tests were then applied to that record: "
+        f"one that knows only its length, and three that know a search took place. "
+        f"{objection[0].upper()}{objection[1:]}."
+    )
+
+
+def _join(items: list[str]) -> str:
+    """``a``, ``a and b``, ``a, b and c`` — the Oxford-free serial form."""
+    if len(items) == 1:
+        return items[0]
+    return f"{', '.join(items[:-1])} and {items[-1]}"
+
+
+def _prose(analysis: Analysis) -> dict[str, str]:
+    """The lead paragraph under each numbered section heading."""
+    naive = analysis.psr
+    search = (
+        "Every variant tried is kept, not just the winner: three of the four tests below "
+        "are undefined without the losers, and a backtester who discards the failures has "
+        "destroyed the evidence needed to judge the survivor. The winner is not nominated "
+        "here — it is the highest realised Sharpe ratio in the family, which is what "
+        "selecting on a backtest actually means."
+    )
+    evidence = (
+        f"The tests are ordered weakest question first. The Probabilistic Sharpe Ratio asks "
+        f"only whether the record is long enough for its own Sharpe ratio to be "
+        f"distinguishable from {naive.benchmark_annual:.2f}; it knows nothing about how many "
+        f"strategies were tried to find it, and it is a precondition rather than a verdict. "
+        f"The three that follow each price the search in a different way — multiplicity, "
+        f"selection stability, and the benchmark — so a single objection is not outvoted by "
+        f"the others."
+    )
+    gap = analysis.winner_sharpe - analysis.dsr_hurdle
+    sigma = analysis.dsr.psr_result.standard_error_annual
+    over_point = analysis.winner_sharpe - analysis.dsr.expected_max_sharpe_annual
+    hurdle = (
+        f"The obvious bar to draw is the expected maximum of noise, "
+        f"{analysis.dsr.expected_max_sharpe_annual:.3f}, and it is the wrong one. That figure "
+        f"is a point estimate of a hurdle, while the winner's {analysis.winner_sharpe:.3f} is "
+        f"an estimate carrying a standard error of {sigma:.3f}. Clearing the point by "
+        f"{over_point:+.3f} is worth only {over_point / sigma:.2f} standard errors, where "
+        f"{DSR_THRESHOLD:.0%} confidence needs 1.64. The bar that follows is "
+        f"{analysis.dsr_hurdle:.3f}, which the winner "
+        f"{'misses' if gap < 0 else 'clears'} by {abs(gap):.3f} and which "
+        f"{analysis.n_trials_above_hurdle} of {analysis.n_trials} variants reach."
+    )
+    return {"search": search, "evidence": evidence, "hurdle": hurdle}
 
 
 def _captions(analysis: Analysis) -> tuple[str, str]:
@@ -358,23 +517,27 @@ def render_report(analysis: Analysis, *, version: str | None = None) -> str:
 
         version = __version__
 
-    verdict_class, verdict_sentence = _VERDICT_STYLE[analysis.verdict.label]
-    rule_sentence = analysis.verdict.narrative.split("\n", 1)[0]
-
+    verdict_class, _ = _VERDICT_STYLE[analysis.verdict.label]
     caption_cumulative, caption_sharpes = _captions(analysis)
+    prose = _prose(analysis)
 
     context: dict[str, Any] = {
         "title": analysis.title,
+        "runhead": "Backtest luck assessment",
         "provenance": analysis.provenance,
         "synthetic": analysis.synthetic,
         "verdict_class": verdict_class,
-        "verdict_sentence": verdict_sentence,
         "label_text": analysis.verdict.label.replace("_", " "),
-        "rule_sentence": rule_sentence,
+        "abstract": _abstract(analysis),
+        "search_paragraph": prose["search"],
+        "evidence_paragraph": prose["evidence"],
+        "hurdle_paragraph": prose["hurdle"],
         "facts": _facts(analysis),
         "rows": _rows(analysis),
-        "figure_cumulative": figure_to_base64(cumulative_return_figure(analysis)),
-        "figure_sharpes": figure_to_base64(trial_sharpe_figure(analysis)),
+        # Titles off: each figure is printed directly above its own numbered
+        # caption, and a heading that restates the caption is noise.
+        "figure_cumulative": figure_to_base64(cumulative_return_figure(analysis, title=False)),
+        "figure_sharpes": figure_to_base64(trial_sharpe_figure(analysis, title=False)),
         "caption_cumulative": caption_cumulative,
         "caption_sharpes": caption_sharpes,
         "caveats": CAVEATS,

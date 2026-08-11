@@ -19,6 +19,25 @@ from luckdetector.report.analysis import Analysis
 from luckdetector.report.html import CAVEATS, render_report, write_report
 
 
+def evidence_table(document: str) -> str:
+    """Just the Table 2 markup.
+
+    Scoped rather than searched document-wide because the abstract also names the
+    tests that objected, so a bare ``document.index("Deflated Sharpe Ratio")``
+    finds the prose rather than the row.
+    """
+    start = document.index("<b>Table 2.")
+    return document[start : document.index("</table>", start)]
+
+
+def section(document: str, heading: str) -> str:
+    """One numbered subsection, from its ``<h3>`` to the next heading."""
+    start = document.index(f"{heading}<span")
+    rest = document[start:]
+    end = rest.find("<h3>")
+    return rest if end == -1 else rest[:end]
+
+
 @pytest.fixture(scope="module")
 def _cache() -> dict[str, str]:
     return {}
@@ -53,6 +72,45 @@ class TestSelfContained:
         assert "<style>" in document
 
 
+class TestPaperLayout:
+    """The document is laid out as a paper, and the structure is load-bearing."""
+
+    def test_has_an_abstract_and_numbered_sections(self, document: str) -> None:
+        assert "<h2>Abstract</h2>" in document
+        for number, heading in enumerate(
+            ["Data and search", "Evidence", "The bar the winner had to clear", "Limitations"],
+            start=1,
+        ):
+            assert f'<span class="n">{number}</span> {heading}' in document
+
+    def test_the_abstract_quotes_the_search_and_the_record(
+        self, document: str, luck_analysis: Analysis
+    ) -> None:
+        """It is composed in Python from the analysis, not written by hand."""
+        assert f"{luck_analysis.n_trials:,} strategy variants" in document
+        assert f"{luck_analysis.winner_sharpe:.3f}" in document
+        assert luck_analysis.winner_label in document
+
+    def test_tables_are_captioned_above_and_figures_below(self, document: str) -> None:
+        """Paper convention, and the two are not interchangeable."""
+        assert "<caption><b>Table 1.</b>" in document
+        assert "<b>Table 2.</b>" in document
+        assert "<figcaption><b>Figure 1.</b>" in document
+        assert "<figcaption><b>Figure 2.</b>" in document
+
+    def test_tables_have_no_vertical_rules(self, document: str) -> None:
+        """Booktabs style: horizontal rules only, top, mid and bottom."""
+        css = document.split("</style>")[0]
+        assert "border-left" not in css
+        assert "border-right" not in css
+        assert "border-top: 1.4px solid" in css
+
+    def test_carries_no_dashboard_chrome(self, document: str) -> None:
+        """The verdict is stated once, in the abstract, not as a coloured banner."""
+        assert "banner" not in document
+        assert document.count('class="verdict"') == 1
+
+
 class TestEvidenceTable:
     def test_has_one_row_per_test_in_order(self, document: str, luck_analysis: Analysis) -> None:
         titles = [
@@ -61,9 +119,15 @@ class TestEvidenceTable:
             "Probability of Backtest Overfitting",
             "Reality Check / SPA",
         ]
-        positions = [document.index(title) for title in titles]
+        table = evidence_table(document)
+        positions = [table.index(title) for title in titles]
         assert positions == sorted(positions), "evidence is not rendered in TEST_ORDER"
         assert len(luck_analysis.verdict.results) == 4
+
+    def test_each_test_also_gets_its_own_numbered_subsection(self, document: str) -> None:
+        """Paper layout: the table is the summary, the subsections are the argument."""
+        for index in range(1, 5):
+            assert f">2.{index}&nbsp;" in document
 
     def test_statistics_are_the_ones_on_the_results(
         self, document: str, luck_analysis: Analysis
@@ -85,11 +149,13 @@ class TestEvidenceTable:
             fragment = result.interpretation.split(",")[0]
             assert fragment in document
 
-    def test_verdict_banner_states_the_label_and_the_rule(
-        self, document: str, luck_analysis: Analysis
-    ) -> None:
-        assert luck_analysis.label.replace("_", " ") in document
-        assert "banner luck" in document
+    def test_abstract_states_the_verdict(self, document: str, luck_analysis: Analysis) -> None:
+        assert f'<span class="verdict">{luck_analysis.label.replace("_", " ")}</span>' in document
+
+    def test_the_single_accent_is_keyed_to_the_verdict(self, document: str) -> None:
+        """One accent per document, set on the article, so the rest can stay black."""
+        assert '<article class="v-luck">' in document
+        assert "--accent" in document
 
 
 @pytest.fixture(scope="module")
@@ -115,13 +181,19 @@ class TestNotApplicableIsNotBuried:
     """``NOT_APPLICABLE`` gets its own treatment, because on SPY it is the finding."""
 
     def test_is_rendered_as_its_own_status(self, na_document: str) -> None:
-        assert "NOT APPLICABLE" in na_document
-        assert "evidence na" in na_document
+        assert 'class="st na"' in na_document
+        assert "not applicable" in na_document
+
+    def test_gets_a_numbered_subsection_like_every_other_test(self, na_document: str) -> None:
+        """Not a footnote, not greyed out — the same structural weight as a pass."""
+        block = section(na_document, "Reality Check / SPA")
+        assert block.startswith("Reality Check / SPA")
+        assert 'class="st na"' in block
 
     def test_is_not_styled_as_a_pass_or_a_failure(self, na_document: str) -> None:
-        block = na_document[na_document.index("evidence na") :][:400]
-        assert "tag pass" not in block
-        assert "tag fail" not in block
+        block = section(na_document, "Reality Check / SPA")
+        assert 'class="st pass"' not in block
+        assert 'class="st fail"' not in block
 
     def test_carries_the_finding_rather_than_a_p_value(self, na_document: str) -> None:
         assert "Not one of the" in na_document
@@ -136,7 +208,8 @@ class TestNotApplicableIsNotBuried:
         turns the weakest cell in the report into its most emphatic rejection.
         The row must show no comparison, because there is none to show.
         """
-        row = na_document[na_document.index("Reality Check / SPA") :][:400]
+        table = evidence_table(na_document)
+        row = table[table.index("Reality Check / SPA") :]
         assert "p = 0.0000" not in row
         assert "0.0500" not in row
         assert row.count("—") >= 2
@@ -146,7 +219,8 @@ class TestSyntheticLabelling:
     def test_synthetic_reports_say_so_loudly(self, edge_analysis: Analysis) -> None:
         document = render_report(edge_analysis)
         assert "SYNTHETIC DATA" in document
-        assert "not from a market" in document
+        assert "not a market" in document
+        assert 'class="synthetic"' in document
 
     def test_real_reports_carry_no_synthetic_banner(self, document: str) -> None:
         assert "SYNTHETIC DATA" not in document

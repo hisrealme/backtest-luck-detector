@@ -148,6 +148,38 @@ class TestTrialSharpeFigure:
         assert "clear of the bar" in figure.axes[0].get_title()
 
 
+class TestTitlesAreOptional:
+    """The report prints each figure directly above its own numbered caption.
+
+    A matplotlib title there would restate the caption a centimetre above it, so
+    the report asks for ``title=False``. The default stays ``True`` because the
+    figures are also used on their own, where nothing else names them.
+    """
+
+    def test_titles_are_on_by_default(self, luck_analysis: Analysis) -> None:
+        assert cumulative_return_figure(luck_analysis).axes[0].get_title()
+        assert trial_sharpe_figure(luck_analysis).axes[0].get_title()
+
+    def test_titles_can_be_suppressed(self, luck_analysis: Analysis) -> None:
+        assert cumulative_return_figure(luck_analysis, title=False).axes[0].get_title() == ""
+        assert trial_sharpe_figure(luck_analysis, title=False).axes[0].get_title() == ""
+
+    def test_suppressing_the_title_changes_nothing_else(self, luck_analysis: Analysis) -> None:
+        """Only the heading goes; the data and the marked lines are untouched."""
+        with_title = trial_sharpe_figure(luck_analysis).axes[0]
+        without = trial_sharpe_figure(luck_analysis, title=False).axes[0]
+        assert len(with_title.lines) == len(without.lines)
+        assert with_title.get_xlim() == without.get_xlim()
+        assert with_title.get_xlabel() == without.get_xlabel()
+
+    def test_the_report_suppresses_them(self, luck_analysis: Analysis) -> None:
+        """Pinned here rather than left to the template to remember."""
+        from luckdetector.report.html import render_report
+
+        document = render_report(luck_analysis)
+        assert "Cumulative return: the reported winner" not in document
+
+
 class TestSyntheticStamp:
     def test_synthetic_data_is_stamped_on_every_figure(self, edge_analysis: Analysis) -> None:
         """The offline path must never produce an image mistakable for a real result."""
