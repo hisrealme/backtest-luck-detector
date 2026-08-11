@@ -23,6 +23,7 @@ from .exceptions import (
     LuckDetectorError,
 )
 from .io import load_returns_csv, load_trials_csv, returns_from_prices
+from .report import assess
 from .stats import (
     MomentSummary,
     annualize_sharpe,
@@ -51,6 +52,7 @@ __all__ = [
     "Verdict",
     "__version__",
     "annualize_sharpe",
+    "assess",
     "deannualize_sharpe",
     "kurtosis",
     "load_returns_csv",

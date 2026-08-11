@@ -52,6 +52,7 @@ from .moments import annualize_sharpe, as_return_series, deannualize_sharpe, sha
 from .psr import PSRResult, probabilistic_sharpe_ratio
 
 __all__ = [
+    "DSR_THRESHOLD",
     "EULER_MASCHERONI",
     "DSRResult",
     "deflated_sharpe_ratio",
@@ -63,6 +64,12 @@ __all__ = [
 
 #: Euler–Mascheroni constant, from the Gumbel limit of the maximum.
 EULER_MASCHERONI = 0.5772156649015329
+
+#: The bar :attr:`DSRResult.passed` applies. Conventional — DSR is a probability
+#: and 0.95 is the usual one-sided level — but named so it can be argued with, and
+#: because the number it gates is far more demanding than the same figure applied
+#: to a naive PSR. On SPY: naive PSR 0.9764 clears it, DSR 0.7692 does not.
+DSR_THRESHOLD = 0.95
 
 TrialCountMethod = Literal["independent", "equicorrelated", "cluster"]
 
@@ -189,8 +196,8 @@ class DSRResult:
 
     @property
     def passed(self) -> bool:
-        """Conventional 95% threshold: does the strategy survive its own search?"""
-        return self.dsr >= 0.95
+        """Does the strategy survive its own search, at :data:`DSR_THRESHOLD`?"""
+        return self.dsr >= DSR_THRESHOLD
 
     @property
     def interpretation(self) -> str:

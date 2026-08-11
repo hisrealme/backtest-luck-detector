@@ -74,6 +74,32 @@ The same 157 strategies score p = 0.24 against zero and p = 1.00 against
 buy-and-hold. **The benchmark is the question**, and a write-up that reports only
 the first has not stated a single false number.
 
+Put the four together and the tool returns one answer:
+
+```
+LIKELY LUCK — at least one test that knows a search took place objected.
+
+  [PASS]           Probabilistic Sharpe Ratio            0.9764
+  [FAIL]           Deflated Sharpe Ratio                 0.7692
+  [FAIL]           Probability of Backtest Overfitting   0.8396
+  [NOT_APPLICABLE] Reality Check / SPA                   no variant beat the benchmark
+```
+
+Read the first line twice. **The naive test passes.** A backtester who computed a
+Probabilistic Sharpe Ratio, got 97.6%, and stopped would have concluded the record
+was sound. Every test that knows a search took place disagrees.
+
+And it is not a machine that says no: run the same rule table on 50 synthetic
+variants of which 5 carry a genuine annualised Sharpe of 3.0, and it returns
+**LIKELY SKILL** with zero flags. That test is in the suite, because a luck
+detector that never finds skill is a rubber stamp.
+
+It is a *conservative* instrument, though, and [`METHODS.md`](docs/METHODS.md) §9
+measures exactly how conservative rather than leaving you to find out: a real,
+persistent Sharpe of 2.0 in 10 of 50 variants over five years is recognised as
+skill only about one time in five. A luck verdict is much weaker evidence of
+absence than it sounds.
+
 That is the whole thesis in one table. A backtester who reported only MA(80,250) would
 show you 205% cumulative and a significant t-statistic, while quietly having lost to
 doing nothing at all for sixteen years.
@@ -100,7 +126,7 @@ build plan and the mathematical specification.
 - [x] Phase 4 — strategy mining engine
 - [x] Phase 5 — PBO via CSCV
 - [x] Phase 6 — Reality Check / SPA
-- [ ] Phase 7 — verdict aggregation
+- [x] Phase 7 — verdict aggregation
 - [ ] Phase 8 — plots, HTML report, CLI *(`luckdet version`, `summary` and `mine` work today; `report` / `demo` pending)*
 - [ ] Phase 9 — docs and release
 
@@ -176,6 +202,20 @@ reality_check(result.trials, result.buy_and_hold)              # White's RC + Ha
 `reality_check` defaults to a benchmark of zero, which is the soft test — "did any of
 these make money". Passing `result.buy_and_hold` asks whether the search was worth
 running at all, and on SPY the two answers are p = 0.24 and p = 1.00.
+
+Then hand whatever you computed to the rule table and get one answer back:
+
+```python
+from luckdetector import assess
+
+verdict = assess(psr=..., dsr=..., pbo=..., spa=...)   # every argument optional
+print(verdict.label)                                    # LIKELY_LUCK
+print(verdict.narrative)                                # ...and which test objected
+```
+
+Every argument is optional and a missing test is never treated as a passing one — a
+verdict built on less evidence says so. The thresholds and the combination rules are
+laid out, and argued with, in [`docs/METHODS.md`](docs/METHODS.md) §9.
 
 `synthetic_prices` is exactly what it says: a GARCH-like path with realistic
 volatility clustering. Nothing here ships fabricated market data dressed up as real

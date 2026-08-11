@@ -31,6 +31,11 @@ BoolArray = npt.NDArray[np.bool_]
 
 VerdictLabel = Literal["LIKELY_SKILL", "INCONCLUSIVE", "LIKELY_LUCK"]
 
+#: Outcome of one test. ``NOT_APPLICABLE`` is not a polite failure — it means the
+#: statistic had nothing to weigh, and it must never be counted as evidence in
+#: either direction. See :class:`TestResult`.
+TestStatus = Literal["PASS", "FAIL", "NOT_APPLICABLE"]
+
 #: Calendar conventions accepted by ``periods_per_year``.
 COMMON_FREQUENCIES: dict[str, int] = {
     "daily": 252,
@@ -237,9 +242,19 @@ class TrialMatrix:
 class TestResult:
     """Outcome of a single statistical test, in a form the report can render.
 
-    ``passed=True`` always means *the evidence is consistent with genuine skill*,
+    ``PASS`` always means *the evidence is consistent with genuine skill*,
     regardless of whether the underlying statistic is a p-value or a probability.
     Keeping that polarity uniform is what lets the verdict layer stay simple.
+
+    **The third state is load-bearing.** A test can produce a number without
+    producing evidence, and collapsing that into pass/fail misreports it in one
+    direction or the other. The case that forced this: on the SPY grid, White's
+    Reality Check returns *p = 1.0000* against buy-and-hold — but only because not
+    one of the 157 variants beat the benchmark, so the statistic is
+    :math:`\\max(0, \\cdot) = 0` and no resample can fall below it. Read as ``FAIL``
+    that is the strongest rejection in the report; read as ``PASS`` it is
+    nonsense. It is neither. The test never ran, and ``NOT_APPLICABLE`` says so
+    while the interpretation string carries what *was* learned.
     """
 
     __test__: ClassVar[bool] = False  # stop pytest trying to collect this as a test class
@@ -247,10 +262,25 @@ class TestResult:
     name: str
     statistic: float
     threshold: float
-    passed: bool
+    status: TestStatus
     p_value: float | None = None
     interpretation: str = ""
     detail: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def passed(self) -> bool:
+        """Is this evidence *for* skill? ``NOT_APPLICABLE`` is not."""
+        return self.status == "PASS"
+
+    @property
+    def flagged(self) -> bool:
+        """Did this test actively raise a flag? ``NOT_APPLICABLE`` never does."""
+        return self.status == "FAIL"
+
+    @property
+    def applicable(self) -> bool:
+        """Did the test have anything to weigh?"""
+        return self.status != "NOT_APPLICABLE"
 
 
 @dataclass(frozen=True)
@@ -263,7 +293,18 @@ class Verdict:
 
     @property
     def n_failed(self) -> int:
-        return sum(1 for r in self.results if not r.passed)
+        """Tests that raised a flag. Inapplicable tests are not failures."""
+        return sum(1 for r in self.results if r.flagged)
+
+    @property
+    def flags(self) -> list[TestResult]:
+        """The tests that objected, in the order they were evaluated."""
+        return [r for r in self.results if r.flagged]
+
+    @property
+    def applicable(self) -> list[TestResult]:
+        """The tests that had something to weigh."""
+        return [r for r in self.results if r.applicable]
 
     def result(self, name: str) -> TestResult:
         for r in self.results:

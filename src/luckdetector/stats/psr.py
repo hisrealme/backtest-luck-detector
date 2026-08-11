@@ -58,6 +58,7 @@ from .moments import (
 )
 
 __all__ = [
+    "PSR_THRESHOLD",
     "PSRResult",
     "min_track_record_length",
     "probabilistic_sharpe_ratio",
@@ -66,6 +67,13 @@ __all__ = [
 ]
 
 GAUSSIAN_KURTOSIS = 3.0
+
+#: The bar :attr:`PSRResult.passed` applies. This one *is* a convention — it is a
+#: one-sided 95% confidence test — but it is named so it can be argued with, and
+#: because the verdict layer treats PSR as a precondition rather than as one flag
+#: among four. **Clearing it means very little on its own:** the SPY winner posts a
+#: naive PSR of 0.9764 and is still, on every selection-aware test, luck.
+PSR_THRESHOLD = 0.95
 
 
 def sharpe_variance_factor(
@@ -133,6 +141,18 @@ class PSRResult:
 
     def __float__(self) -> float:
         return self.psr
+
+    @property
+    def passed(self) -> bool:
+        """Is the record long enough for this Sharpe to be distinguishable at all?
+
+        Polarity matches :class:`luckdetector.types.TestResult`. **This is the
+        weakest test in the package**, and passing it is a precondition for the
+        others rather than a result: it asks only whether the track record beats
+        its benchmark given its own length and higher moments, and knows nothing
+        about how many strategies were tried to find it.
+        """
+        return self.psr >= PSR_THRESHOLD
 
     @property
     def standard_error_annual(self) -> float:

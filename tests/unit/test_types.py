@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 
 from luckdetector.exceptions import DataValidationError, InsufficientDataError
-from luckdetector.types import ReturnSeries, TestResult, TrialMatrix, Verdict
+from luckdetector.types import ReturnSeries, TestResult, TestStatus, TrialMatrix, Verdict
 
 
 class TestReturnSeries:
@@ -125,18 +125,41 @@ class TestTrialMatrix:
 
 
 class TestVerdict:
-    def _result(self, name: str, passed: bool) -> TestResult:
-        return TestResult(name=name, statistic=0.5, threshold=0.5, passed=passed)
+    def _result(self, name: str, status: TestStatus) -> TestResult:
+        return TestResult(name=name, statistic=0.5, threshold=0.5, status=status)
 
-    def test_counts_failures(self) -> None:
+    def test_counts_flags(self) -> None:
         verdict = Verdict(
             label="LIKELY_LUCK",
-            results=[self._result("dsr", False), self._result("pbo", True)],
+            results=[self._result("dsr", "FAIL"), self._result("pbo", "PASS")],
         )
         assert verdict.n_failed == 1
 
+    def test_inapplicable_is_not_a_failure(self) -> None:
+        """The distinction the whole third state exists for.
+
+        A test that had nothing to weigh must not be counted as an objection, or
+        the SPY report would claim SPA rejected when SPA never ran.
+        """
+        verdict = Verdict(
+            label="LIKELY_LUCK",
+            results=[self._result("dsr", "FAIL"), self._result("spa", "NOT_APPLICABLE")],
+        )
+        assert verdict.n_failed == 1
+        assert [r.name for r in verdict.flags] == ["dsr"]
+        assert [r.name for r in verdict.applicable] == ["dsr"]
+
+    def test_status_properties_are_mutually_exclusive(self) -> None:
+        for status, expected in (
+            ("PASS", (True, False, True)),
+            ("FAIL", (False, True, True)),
+            ("NOT_APPLICABLE", (False, False, False)),
+        ):
+            result = self._result("dsr", status)  # type: ignore[arg-type]
+            assert (result.passed, result.flagged, result.applicable) == expected
+
     def test_lookup_by_name(self) -> None:
-        verdict = Verdict(label="INCONCLUSIVE", results=[self._result("dsr", True)])
+        verdict = Verdict(label="INCONCLUSIVE", results=[self._result("dsr", "PASS")])
         assert verdict.result("dsr").passed
         with pytest.raises(KeyError):
             verdict.result("missing")

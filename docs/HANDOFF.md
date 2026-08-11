@@ -10,9 +10,9 @@ specifies Phase 6 precisely enough to implement from.
 
 | | |
 |---|---|
-| Phases complete | 0–6 (scaffolding, core model, PSR/DSR, bootstrap, mining, PBO, RC/SPA) |
-| Commits | 17, all authored `hisrealme <315065552+hisrealme@users.noreply.github.com>` |
-| Tests | 294 passing, 1 skipped (1 network test deselected), **97%** coverage |
+| Phases complete | 0–7 (scaffolding, core model, PSR/DSR, bootstrap, mining, PBO, RC/SPA, verdict) |
+| Commits | 23, all authored `hisrealme <315065552+hisrealme@users.noreply.github.com>` (the count in the Phase 5 handoff was stale — this one is `git rev-list --count HEAD`) |
+| Tests | 327 passing, 1 skipped (1 network test deselected), **97%** coverage |
 | Gates | `ruff` clean, `mypy --strict` clean |
 | CI | GitHub Actions, Python 3.10 / 3.11 / 3.12 / 3.13 / 3.14 — **green on the new repo** |
 | Repo | `github.com/hisrealme/backtest-luck-detector`, public |
@@ -38,9 +38,11 @@ src/luckdetector/
     ├── bootstrap.py    iid / circular / stationary, Politis–White block length
     ├── pbo.py          PBO via CSCV, degradation, dominance   ← Phase 5
     └── reality_check.py  White's RC + Hansen's SPA, 3 variants  ← Phase 6
+└── report/
+    └── verdict.py      rule table → Verdict + narrative       ← Phase 7
 ```
 
-`docs/METHODS.md` now exists and covers phases 0–6. **Extend it in the same pass as
+`docs/METHODS.md` now exists and covers phases 0–7. **Extend it in the same pass as
 each new phase**, not afterwards — the reasoning is only cheap to write down while
 it is fresh.
 
@@ -298,9 +300,10 @@ Python 3.10 is the floor (`zip(strict=True)`, runtime `X | None` in typer signat
 macOS system Python is 3.9 and will not work. Editable installs need pip ≥ 21.3.
 
 `outputs/` holds the cached SPY CSV and the saved run summaries (`spy_run.txt`,
-`spy_pbo.txt`). It is gitignored — real prices stay local and are available for
-analysis without re-downloading. Reported numbers live in `README.md` and
-`docs/METHODS.md` so a stranger cloning the repo can still see them.
+`spy_pbo.txt`, `spy_rc_spa.txt`, `spy_verdict.txt`). It is gitignored — real prices
+stay local and are available for analysis without re-downloading. Reported numbers
+live in `README.md` and `docs/METHODS.md` so a stranger cloning the repo can still
+see them.
 
 ### Notes for agent sessions — read before running anything
 
@@ -344,10 +347,26 @@ before pushing**, and treat a green sandbox as necessary but not sufficient.
     test asserts it there. On SPY against zero it fails — RC 0.24, SPA 0.43 —
     because none of the 157 falls below Hansen's cutoff, so only the studentisation
     is in play. Do not quote it as a general property.
+- **Known gap in Phase 7 — the verdict layer has poor power, measured.** The SPY
+  *luck* verdict is robust to any defensible threshold: DSR flags above 0.77, PBO
+  below 0.84, and one flag suffices. The *skill* side is weak. Across 25
+  independent datasets, a genuine annualised Sharpe of 2.0 planted in 10 of 50
+  variants over five years is called LIKELY_SKILL only **20%** of the time; it
+  takes 5 of 50 at Sharpe 3.0 over ten years to reach 100%. **DSR is the binding
+  constraint at every effect size** — PBO returns 0.000 and SPA rejects throughout.
+  So LIKELY_LUCK is weak evidence of absence. Full power table in METHODS §9;
+  `test_detection_rate_at_a_realistic_edge_is_poor` pins the figure so it cannot
+  drift or be quietly threshold-tuned away. Do not "fix" this by lowering
+  `DSR_THRESHOLD` — the conservatism is the instrument working, and the honest
+  response is the caveat, not a friendlier bar.
+  - Worth checking before Phase 8 whether the effective-trial count is the real
+    culprit: DSR's hurdle rises with the *dispersion* of trial Sharpes, so planting
+    5 good variants scores better than planting 10 of the same quality. That is
+    arguably correct, but it has not been examined.
 - **The phase plan was cut after Phase 5** — see `docs/BLUEPRINT.md` §6 and §6a. The
   Harvey–Liu haircut is dropped as redundant with DSR; the standalone validation
   suite is folded into `tests/unit/` where the calibration tests already live; the
   CLI merges into the report phase; the manim animation layer is dropped entirely.
-  What remains after Phase 6: **7 verdict, 8 report + CLI, 9 docs and release.**
+  What remains after Phase 7: **8 report + CLI, 9 docs and release.**
   Do not resurrect `stats/haircut.py`, `tests/validation/` or `animations/` — each
   was removed for a reason recorded in §6a.
