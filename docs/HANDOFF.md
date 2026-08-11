@@ -1,8 +1,11 @@
 # Current state and next steps
 
-Written at the end of Phase 5. Read this before touching the code — it records the
-decisions that have already been argued out, so they don't get re-litigated, and it
-specifies Phase 6 precisely enough to implement from.
+Written at the end of Phase 5, extended at the end of Phases 6 and 7. Read this before
+touching the code — it records the decisions that have already been argued out, so they
+don't get re-litigated, and it specifies the next phase precisely enough to implement
+from. **The next phase is 8, specified in §6.** Sections 4 and 5 are the closed records
+of Phases 6 and 7, kept because both specs turned out to contain errors worth
+remembering.
 
 ---
 
@@ -165,7 +168,7 @@ Hansen (2005), *A Test for Superior Predictive Ability*, JBES 23(4).
 > RC 0.2428 and SPA 0.4306. Full run in `outputs/spy_rc_spa.txt`; the reasoning
 > is in `METHODS.md` §8, the numbers in §9.
 >
-> **Two limitations found that are worth carrying forward** — see §6.
+> **Two limitations found that are worth carrying forward** — see §8.
 
 **Null: no strategy in the family beats the benchmark.**
 
@@ -288,7 +291,127 @@ buy-and-hold would genuinely surprise.
 
 ---
 
-## 5. Environment
+## 5. Phase 7 — verdict aggregation — **DONE**
+
+Shipped in `report/verdict.py`, 35 tests, 100% coverage on the module. Three design
+questions were settled before implementation and should not be re-opened casually:
+
+**Worst flag wins.** Five rules, evaluated in order, first match wins:
+`no-evidence` → INCONCLUSIVE; `record-too-short` (PSR is the *only* flag) →
+INCONCLUSIVE; `flagged` → LIKELY_LUCK; `psr-only` → INCONCLUSIVE; `clean` →
+LIKELY_SKILL. No composite score, deliberately: a weighted average would hide which
+evidence drove the answer.
+
+**PSR is a precondition, not a fourth flag.** A lone PSR flag means "we cannot tell
+yet", and PSR alone can never certify skill — it is the naive test this package
+exists to debunk, and the SPY winner clears it at 0.9764 while failing everything
+that knows a search took place. LIKELY_SKILL requires at least one of DSR, PBO or
+SPA to have run and passed.
+
+**`TestResult` has three states.** `NOT_APPLICABLE` exists because an SPA p-value of
+1.0 obtained because *nothing beat the benchmark* is an empty comparison, not a
+rejection. It neither flags nor counts toward the evidence LIKELY_SKILL needs.
+
+`PSR_THRESHOLD` and `DSR_THRESHOLD` were named alongside the existing
+`PBO_THRESHOLD` and `SIGNIFICANCE_LEVEL`. METHODS §9 states plainly that three of the
+four are conventional and the combination logic is invented.
+
+**The finding that matters most from this phase is in §8 open items: detection power
+is poor.** A genuine Sharpe of 2.0 is called LIKELY_SKILL 20% of the time. Read that
+before designing anything in Phase 8 that claims the tool "detects" edge.
+
+---
+
+## 6. Phase 8 — Report + CLI (next)
+
+**Deliverable:** `report/plots.py`, `report/html.py`, and the CLI commands that drive
+them. Done when `luckdet demo` runs end to end from a clean install, produces one
+self-contained HTML file, and the two figures are snapshot-tested.
+
+`report/verdict.py` deliberately takes *computed results* rather than raw returns, so
+that no statistics live in user-facing code. Phase 8 is the wiring that was kept out
+of Phase 7 on purpose.
+
+### Decisions already taken — implement these, don't re-litigate
+
+**Demo data: cache, then download, then refuse.** `luckdet demo` uses the `outputs/`
+cache if present, downloads if not, and if neither is available **fails with a message
+pointing at `luckdet demo --offline`**. The offline path runs on `synthetic_prices`
+and labels every figure and every number `SYNTHETIC`. This keeps "synthetic data is
+for tests, never for headlines" (§3) intact while still working without a network. Do
+not quietly fall back to synthetic — the failure has to be loud, and the offline
+output has to be unmistakable.
+
+**Two figures.**
+
+1. *Cumulative return, winner vs buy-and-hold.* The "+205.6% looks superb until you
+   see +814.3%" picture. One line each, drawdown shading optional.
+2. *Distribution of all 157 trial Sharpes*, with the expected-max-of-noise hurdle
+   (0.309) and the winner (0.491) marked on it. This is the whole thesis in one
+   image: the winner sits inside the noise distribution.
+
+Snapshot-test them on **structure, not pixels** — number of axes, series lengths,
+labels, tick counts. Image hashes break on every matplotlib and font change and will
+rot the suite; there is no value in asserting on anti-aliasing.
+
+**HTML: a full report, single file.** Verdict banner; the four-row evidence table with
+statistic, threshold and status; both figures inline as base64 so the file is
+genuinely self-contained; each test's `interpretation` paragraph; and the caveats —
+bull-market window, the CSCV purging gap (§8), and the low detection power (§8). Jinja2
+is already a dependency. No external CSS, no CDN, no JavaScript.
+
+### Notes that will save time
+
+**The verdict layer already produces the report's spine.** `Verdict.results` is
+ordered by `TEST_ORDER`, each `TestResult` carries `name`, `statistic`, `threshold`,
+`status`, `interpretation` and a `detail` dict, and `TEST_TITLES` in
+`report/verdict.py` maps short keys to human titles. The template should render that
+list rather than re-deriving anything.
+
+**Render `NOT_APPLICABLE` as its own thing.** Not as a pass, not as a failure, not
+greyed out into invisibility. On the SPY report it carries the single strongest
+sentence in the analysis — "not one of the 157 strategies beat buy-and-hold" — and a
+template that styles it as a muted footnote would bury the best finding in the
+project.
+
+**The demo needs both halves.** BLUEPRINT §7 step 6: run it on SPY and get
+LIKELY_LUCK, then run it on a planted edge and get LIKELY_SKILL. Use the effect size
+from `tests/unit/test_verdict.py::edge_trials` — 5 of 50 variants at Sharpe 3.0 over
+ten years — because that is the configuration measured to return LIKELY_SKILL on all
+25 datasets tried. A weaker edge will make the demo flaky, and §8 explains why.
+
+**`luckdet demo` should not invent numbers.** Everything it prints should come from
+the same functions the library exposes. If the demo needs a helper that runs all four
+statistics over a `MiningResult`, that helper belongs in the library with a test, not
+in `cli.py`.
+
+**Existing CLI:** `version`, `summary`, `mine` work today. `report` and `demo` are the
+new ones. `cli.py` has `B008` ignored in ruff config because typer requires calls in
+argument defaults.
+
+### Acceptance criteria
+
+- `luckdet demo` from a clean clone: cache/download path produces the SPY narrative
+  ending in LIKELY_LUCK, then the planted-edge narrative ending in LIKELY_SKILL.
+- `luckdet demo --offline` runs with no network and labels everything SYNTHETIC.
+- One HTML file, opens correctly with no network access, no external assets.
+- Both figures snapshot-tested on structure; no image-hash assertions.
+- No network in tests. The demo's data loading is tested through the injectable
+  downloader already in `io/prices.py`.
+- `make check` green; coverage stays at or above 90% on `src/luckdetector/stats/`.
+
+### Prediction, written down so it can be checked rather than rationalised
+
+The HTML report will be the easiest phase so far and the plots the fiddliest part of
+it — specifically, getting the Sharpe-distribution figure to make the hurdle legible
+without it looking like the winner is far from the mass, when the point is that it is
+*inside* it. I expect at least one caveat to be discovered while writing the template
+that is not yet in METHODS. Phases 5, 6 and 7 each turned up a spec error; if Phase 8
+turns up none, that is more likely to mean the spec was vague than that it was right.
+
+---
+
+## 7. Environment
 
 ```bash
 cd ~/Documents/"Project 1"
@@ -326,7 +449,7 @@ before pushing**, and treat a green sandbox as necessary but not sufficient.
 
 ---
 
-## 6. Open items
+## 8. Open items
 
 - ~~Delete the old GitHub repo (`backtest-luck-detector-old`)~~ — **done**. The
   pre-rename commits are off GitHub's servers.
