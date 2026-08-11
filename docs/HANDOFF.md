@@ -10,9 +10,9 @@ specifies Phase 6 precisely enough to implement from.
 
 | | |
 |---|---|
-| Phases complete | 0–5 (scaffolding, core model, PSR/DSR, bootstrap, mining, PBO) |
-| Commits | 16, all authored `hisrealme <315065552+hisrealme@users.noreply.github.com>` |
-| Tests | 247 passing, 1 skipped (1 network test deselected), **96%** coverage |
+| Phases complete | 0–6 (scaffolding, core model, PSR/DSR, bootstrap, mining, PBO, RC/SPA) |
+| Commits | 17, all authored `hisrealme <315065552+hisrealme@users.noreply.github.com>` |
+| Tests | 294 passing, 1 skipped (1 network test deselected), **97%** coverage |
 | Gates | `ruff` clean, `mypy --strict` clean |
 | CI | GitHub Actions, Python 3.10 / 3.11 / 3.12 / 3.13 / 3.14 — **green on the new repo** |
 | Repo | `github.com/hisrealme/backtest-luck-detector`, public |
@@ -36,10 +36,11 @@ src/luckdetector/
     ├── psr.py          Probabilistic Sharpe Ratio, MinTRL
     ├── dsr.py          Deflated Sharpe Ratio, expected_max_sharpe, effective trials
     ├── bootstrap.py    iid / circular / stationary, Politis–White block length
-    └── pbo.py          PBO via CSCV, degradation, dominance   ← Phase 5
+    ├── pbo.py          PBO via CSCV, degradation, dominance   ← Phase 5
+    └── reality_check.py  White's RC + Hansen's SPA, 3 variants  ← Phase 6
 ```
 
-`docs/METHODS.md` now exists and covers phases 0–5. **Extend it in the same pass as
+`docs/METHODS.md` now exists and covers phases 0–6. **Extend it in the same pass as
 each new phase**, not afterwards — the reasoning is only cheap to write down while
 it is fresh.
 
@@ -143,10 +144,26 @@ never assert on one draw — otherwise it passes or fails on the seed.
 
 ---
 
-## 4. Phase 6 — Reality Check & SPA (next)
+## 4. Phase 6 — Reality Check & SPA — **DONE**
 
 White (2000), *A Reality Check for Data Snooping*, Econometrica 68(5).
 Hansen (2005), *A Test for Superior Predictive Ability*, JBES 23(4).
+
+> **Shipped in `stats/reality_check.py`, 47 tests, 100% coverage on the module.**
+> The spec below is left as written so the corrections stay legible. **Two of its
+> claims had the sign backwards**, both flagged inline and both now asserted in
+> tests:
+>
+> * "adding garbage will *lower* RC's p-value" — it raises it, monotonically;
+> * "independent resampling gives p-values far too *small*" — too large, for the
+>   positively correlated families mining produces.
+>
+> **SPY result.** Against buy-and-hold every p-value is exactly 1.0000 (all 157
+> variants have a negative mean differential, so `V_SPA = 0`). Against zero,
+> RC 0.2428 and SPA 0.4306. Full run in `outputs/spy_rc_spa.txt`; the reasoning
+> is in `METHODS.md` §8, the numbers in §9.
+>
+> **Two limitations found that are worth carrying forward** — see §6.
 
 **Null: no strategy in the family beats the benchmark.**
 
@@ -202,6 +219,13 @@ Two improvements over RC, both of which matter:
 independently destroys the cross-sectional dependence that makes `max_k` meaningful
 and will silently produce p-values that are far too small. This is the single easiest
 way to get RC/SPA wrong.
+> **Correction.** The instruction is right, the direction is not. A mined family is
+> mostly *positively* correlated, so independent resampling prices 157 near-duplicate
+> rules as 157 separate bets, draws the null maximum too high, and returns p-values
+> that are too **large** — it costs power rather than manufacturing significance.
+> Measured on 20 exact duplicates, where the family is one bet by construction:
+> shared indices give p = 0.002, matching the single-strategy answer exactly;
+> independent resampling gives 0.020. See `test_independent_resampling_would_over_penalise`.
 
 **Vectorise via a count matrix, as in Phase 5.** For replicate `b` with index vector
 `idx_b`, the resampled mean for strategy `k` is `f[k] @ bincount(idx_b) / T`. So
@@ -224,7 +248,15 @@ it.
 - Adding pure-garbage strategies to a family must **not** lower the SPA p-value,
   but *will* lower RC's — demonstrate both, that contrast is the whole argument
   for SPA.
+  > **Correction.** Garbage *raises* RC's p-value, and cannot do anything else: a
+  > maximum over a superset is weakly larger for every replicate while the observed
+  > statistic is unchanged. That is Hansen's actual complaint about RC and the
+  > contrast is sharper for it. Measured with the resampling indices pinned, 10
+  > strategies then + 100 garbage: RC 0.011 → 0.140, SPA consistent 0.013 → 0.013
+  > (bit-identical), SPA upper 0.014 → 0.171. `upper` is RC's recentring
+  > studentised, so its degrading alongside RC confirms the mechanism.
 - Runs 157 × 4,173 with B = 1,000 in reasonable time. Vectorise.
+  > **Met.** Both SPY benchmarks, B = 1,000, in 0.17s total.
 
 ### Files
 
@@ -243,6 +275,14 @@ bug before believing it.
 Note the Phase 5 lesson about worthless predictions: "the slope will be negative" was
 unfalsifiable. The prediction above is falsifiable — a p-value below 0.1 against
 buy-and-hold would genuinely surprise.
+
+> **Outcome: the headline prediction held in its strongest form, the secondary one
+> did not.** Against buy-and-hold, p = 1.0000 exactly — "well above 0.5" was right,
+> and for the stated reason. Against zero, RC came in at 0.2428, which is not
+> "marginal" by any reading; "SPA more conservative" was right (0.4306 > 0.2428) but
+> for a reason the prediction did not anticipate — nothing is bad enough relative to
+> zero to be recentred, so SPA's second improvement never engages and only the
+> studentisation is left. Recorded rather than rounded into a hit.
 
 ---
 
@@ -292,6 +332,18 @@ before pushing**, and treat a green sandbox as necessary but not sufficient.
   250-day-lookback rule is contaminated near each seam. This makes the winner look
   *more* persistent than it is, so the true PBO is likely worse than 0.84. A purged
   variant is the obvious extension.
+- **Known gaps in Phase 6**, both measured rather than suspected:
+  - **SPA does not protect against pruning the family.** It defends against
+    *padding* with obvious garbage; *deleting* the merely-bad variants after seeing
+    the results defeats both tests equally. On the real SPY family against zero,
+    pruning 157 → best 16 moves RC 0.242 → 0.068 and SPA 0.411 → 0.065, with
+    nothing recentred at any stage. Same honest-book-keeping dependence DSR has and
+    PBO does not.
+  - **"SPA ≥ RC power" is not a universal domination.** It holds in the case SPA
+    was designed for (a real edge buried among genuinely bad strategies) and the
+    test asserts it there. On SPY against zero it fails — RC 0.24, SPA 0.43 —
+    because none of the 157 falls below Hansen's cutoff, so only the studentisation
+    is in play. Do not quote it as a general property.
 - **The phase plan was cut after Phase 5** — see `docs/BLUEPRINT.md` §6 and §6a. The
   Harvey–Liu haircut is dropped as redundant with DSR; the standalone validation
   suite is folded into `tests/unit/` where the calibration tests already live; the

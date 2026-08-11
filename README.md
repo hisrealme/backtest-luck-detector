@@ -61,6 +61,19 @@ winner's return stream minus buy-and-hold's has an annualised Sharpe of **-0.416
 The entire exercise destroyed value, and 26 of the variants (17%) posted a negative
 Sharpe outright.
 
+Three more tests agree, and they disagree about *how* damning it is:
+
+| Test | Result | Reading |
+|---|---|---|
+| Deflated Sharpe Ratio | 0.7692 | probably luck |
+| PBO via CSCV, 12,870 splits | 0.8396 | selection is worse than picking at random |
+| Reality Check / SPA vs buy-and-hold | p = 1.0000 | nothing in the family to test |
+| Reality Check / SPA vs zero | p = 0.24 / 0.43 | not significant even against the soft benchmark |
+
+The same 157 strategies score p = 0.24 against zero and p = 1.00 against
+buy-and-hold. **The benchmark is the question**, and a write-up that reports only
+the first has not stated a single false number.
+
 That is the whole thesis in one table. A backtester who reported only MA(80,250) would
 show you 205% cumulative and a significant t-statistic, while quietly having lost to
 doing nothing at all for sixteen years.
@@ -86,7 +99,7 @@ build plan and the mathematical specification.
 - [x] Phase 3 — bootstrap engine
 - [x] Phase 4 — strategy mining engine
 - [x] Phase 5 — PBO via CSCV
-- [ ] Phase 6 — Reality Check / SPA
+- [x] Phase 6 — Reality Check / SPA
 - [ ] Phase 7 — verdict aggregation
 - [ ] Phase 8 — plots, HTML report, CLI *(`luckdet version`, `summary` and `mine` work today; `report` / `demo` pending)*
 - [ ] Phase 9 — docs and release
@@ -149,6 +162,20 @@ from luckdetector.mining import mine, synthetic_prices
 result = mine(synthetic_prices(3780, seed=42), cost_bps=1.0)   # 157 variants, 15 years
 print(deflated_sharpe_ratio_from_trials(result.trials).interpretation)
 ```
+
+Then ask the two harder questions — does the in-sample winner survive out-of-sample,
+and did any variant beat the thing you could have done instead?
+
+```python
+from luckdetector.stats import probability_of_backtest_overfitting, reality_check
+
+probability_of_backtest_overfitting(result.trials)             # 0.5 is the noise baseline
+reality_check(result.trials, result.buy_and_hold)              # White's RC + Hansen's SPA
+```
+
+`reality_check` defaults to a benchmark of zero, which is the soft test — "did any of
+these make money". Passing `result.buy_and_hold` asks whether the search was worth
+running at all, and on SPY the two answers are p = 0.24 and p = 1.00.
 
 `synthetic_prices` is exactly what it says: a GARCH-like path with realistic
 volatility clustering. Nothing here ships fabricated market data dressed up as real

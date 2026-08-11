@@ -1,4 +1,4 @@
-"""Statistical machinery: moments, PSR/DSR, bootstrap, PBO, Reality Check, haircut."""
+"""Statistical machinery: moments, PSR/DSR, bootstrap, PBO, Reality Check and SPA."""
 
 from __future__ import annotations
 
@@ -42,6 +42,10 @@ from .psr import (
     probabilistic_sharpe_ratio,
     sharpe_standard_error,
 )
+from .reality_check import (
+    RealityCheckResult,
+    reality_check,
+)
 
 __all__ = [
     "BootstrapResult",
@@ -50,6 +54,7 @@ __all__ = [
     "MomentSummary",
     "PBOResult",
     "PSRResult",
+    "RealityCheckResult",
     "annualize_sharpe",
     "bootstrap_distribution",
     "contiguous_blocks",
@@ -69,6 +74,7 @@ __all__ = [
     "permutation_null",
     "probabilistic_sharpe_ratio",
     "probability_of_backtest_overfitting",
+    "reality_check",
     "sharpe_ratio",
     "sharpe_standard_error",
     "skewness",
