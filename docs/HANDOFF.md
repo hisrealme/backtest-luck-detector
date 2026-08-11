@@ -281,5 +281,10 @@ environment caught, so **always run `make check` locally before pushing**.
   250-day-lookback rule is contaminated near each seam. This makes the winner look
   *more* persistent than it is, so the true PBO is likely worse than 0.84. A purged
   variant is the obvious extension.
-- Phases 7–12 and the manim scenes are specified in `docs/BLUEPRINT.md` (see §6a for
-  the animation layer's isolation rules). Animation is Phase 9, not before.
+- **The phase plan was cut after Phase 5** — see `docs/BLUEPRINT.md` §6 and §6a. The
+  Harvey–Liu haircut is dropped as redundant with DSR; the standalone validation
+  suite is folded into `tests/unit/` where the calibration tests already live; the
+  CLI merges into the report phase; the manim animation layer is dropped entirely.
+  What remains after Phase 6: **7 verdict, 8 report + CLI, 9 docs and release.**
+  Do not resurrect `stats/haircut.py`, `tests/validation/` or `animations/` — each
+  was removed for a reason recorded in §6a.

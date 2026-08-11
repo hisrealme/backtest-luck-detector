@@ -21,7 +21,7 @@ Three distinct failure modes get conflated in practice, and this project separat
 | Failure mode | Question it answers | Test used here |
 |---|---|---|
 | **Small-sample noise** | Is the track record long enough to distinguish this Sharpe from zero, given fat tails? | PSR, MinTRL |
-| **Selection bias** (multiple testing) | Would the best of N random strategies look this good anyway? | DSR, Reality Check, SPA, Harvey-Liu haircut |
+| **Selection bias** (multiple testing) | Would the best of N random strategies look this good anyway? | DSR, Reality Check, SPA |
 | **Overfitting** (in-sample tuning) | Does the parameter choice that looked best in-sample survive out-of-sample? | PBO via CSCV |
 
 A tool that only does one of these is a toy. Doing all three, and reconciling them into one
@@ -67,8 +67,7 @@ backtest-luck-detector/
 │   │   ├── dsr.py                # expected max Sharpe, Deflated Sharpe Ratio, N_eff
 │   │   ├── bootstrap.py          # iid / circular-block / stationary bootstrap, permutation
 │   │   ├── reality_check.py      # White's RC, Hansen's SPA
-│   │   ├── pbo.py                # CSCV → PBO, degradation, stochastic dominance
-│   │   └── haircut.py            # Harvey-Liu: Bonferroni / Holm / BHY haircut Sharpe
+│   │   └── pbo.py                # CSCV → PBO, degradation, stochastic dominance
 │   │
 │   ├── mining/
 │   │   ├── signals.py            # parameter grids: MA cross, momentum, RSI, breakout
@@ -82,8 +81,7 @@ backtest-luck-detector/
 │   └── cli.py                    # typer app
 │
 ├── tests/
-│   ├── unit/                     # one file per module
-│   ├── validation/               # null calibration + power studies (slow marker)
+│   ├── unit/                     # one file per module; null calibration lives here too
 │   └── data/                     # small bundled fixtures
 │
 ├── examples/
@@ -228,21 +226,31 @@ strategies that are *very* bad from the recentring (threshold
 longer make the good one look significant by dragging down the null. We report
 lower / consistent / upper p-values.
 
-### 5.6 Harvey–Liu haircut Sharpe (2015)
+### 5.6 Harvey–Liu haircut Sharpe (2015) — **cut**
 
-Given an observed t-statistic and `M` tests, compute the multiple-testing-adjusted p-value
-under Bonferroni, Holm, and Benjamini–Hochberg–Yekutieli, then map back:
+Originally Phase 7: adjust an observed t-statistic under Bonferroni, Holm and
+Benjamini–Hochberg–Yekutieli, then map back to `haircut SR = SR · (t_adj / t_obs)`.
 
-```
-haircut SR = SR · (t_adjusted / t_observed)
-```
+**Dropped as redundant.** It answers the same question as the Deflated Sharpe Ratio —
+*how much of this edge survives the number of things you tried* — using a cruder
+instrument. DSR prices multiplicity through extreme value theory with a correlation-
+discounted effective trial count; Bonferroni assumes independence and ignores the
+dispersion of the trials entirely. Building both would mean doing one job twice, with
+the weaker method arriving second.
 
-Reported as a percentage haircut — "your Sharpe of 1.8 is really 0.7 after accounting for the
-480 strategies you tried" is the single most legible line in the whole report.
+The quotable line it was meant to produce ("your Sharpe of 1.8 is really 0.7") is
+already available from DSR, and stated better: *the best of 12 independent noise
+trials would have scored 0.31, and you scored 0.49.*
+
+Kept in this document rather than deleted so the reasoning survives the decision. See
+§6 for what replaced the phase.
 
 ## 6. Phase plan
 
 Each phase ends with green tests and one commit. Nothing moves forward on red.
+
+**Revised after Phase 5** — thirteen entries down to ten, and the plan now ends at
+Phase 9 rather than Phase 12. See §6a for what was cut and why.
 
 | # | Phase | Deliverable | Done when |
 |---|---|---|---|
@@ -253,36 +261,49 @@ Each phase ends with green tests and one commit. Nothing moves forward on red.
 | 4 | Mining engine | `mining/` | 500-strategy grid on SPY in < 10 s; vectorised output matches a naive loop |
 | 5 | PBO / CSCV | `stats/pbo.py` | PBO ≈ 0.5 on synthetic noise; PBO < 0.1 on synthetic true-edge data |
 | 6 | RC / SPA | `stats/reality_check.py` | p-values ~Uniform(0,1) under the null (KS test passes); SPA ≥ RC power on a planted edge |
-| 7 | Haircut | `stats/haircut.py` | Matches Harvey–Liu published table; Bonferroni ≥ Holm ≥ BHY ordering holds |
-| 8 | Verdict | `report/verdict.py` | Rule table unit-tested at every boundary; no test can be silently ignored |
-| 9 | Report | `report/plots.py`, `report/html.py` | Single self-contained HTML with embedded figures; snapshot-tested |
-| 10 | CLI | `cli.py` | `luckdet demo` runs end-to-end from a clean install |
-| 11 | **Validation suite** | `tests/validation/` | Every test calibrated: size ≈ nominal under null, documented power curves |
-| 12 | Docs + publish | README, METHODS, notebook | Repo is legible to a stranger in 60 seconds; v0.1.0 tagged and pushed |
+| 7 | Verdict | `report/verdict.py` | Rule table unit-tested at every boundary; thresholds named as constants and defended in METHODS |
+| 8 | Report + CLI | `report/plots.py`, `report/html.py`, `cli.py` | `luckdet demo` runs end-to-end from a clean install; single self-contained HTML; two figures, snapshot-tested |
+| 9 | Docs + publish | README, METHODS, notebook | Repo is legible to a stranger in 60 seconds; v0.1.0 tagged and pushed |
 
-## 6a. Animation layer (amendment, Phase 9)
+Power curves for each statistic are folded into `tests/unit/` alongside the
+calibration tests that already live there, marked `slow`. They are not a phase.
 
-Static matplotlib figures go in the HTML report. Separately, a **manim** explainer
-covers the ideas that prose handles badly. Decisions taken:
+## 6a. Scope cuts (amendment, after Phase 5)
 
-* **ManimCommunity** (`pip install manim`), not ManimGL. Stable API, real docs,
-  Cairo renderer with no OpenGL dependency.
-* Built **at Phase 9**, once there are real results to animate.
-* Scenes: (1) best-of-N — 200 equity curves, the winner extracted, the
-  distribution of maxima assembling beneath it; (2) CSCV block shuffling into
-  PBO; (3) the DSR hurdle climbing with N against a fixed strategy Sharpe;
-  (4) bootstrap resampling building a null distribution.
+Two numbered phases were removed, one was merged, and the animation layer was
+dropped entirely. The project had reached the point where
+additional *statistics* added nothing and additional *legibility* added a lot: a
+reader spends about sixty seconds here, and everything that does not survive that
+minute was work done for its own sake. Recording the reasoning so it is not
+relitigated.
 
-**Isolation requirements — non-negotiable:**
+**Cut — the manim animation layer.** Four scenes, a toolchain of ffmpeg, Pango and
+LaTeX, rendering necessarily excluded from CI so it would rot unnoticed, to produce a
+GIF in a README. The stated goal — "README opens with the demo result and a figure" —
+is satisfied by two static matplotlib figures at a small fraction of the cost. This
+was the single largest item in the remaining plan and the one with the weakest link
+to anything a reader would check.
 
-* Lives in `animations/`, *outside* the `luckdetector` package. Nothing in `src/`
-  may import manim.
-* Declared as an optional extra (`.[animation]`), never a core dependency —
-  manim pulls in ffmpeg, Pango and a LaTeX distribution.
-* Excluded from the CI matrix. A separate workflow may lint the scene files, but
-  rendering never runs in CI.
-* Rendered output committed as compressed GIF/MP4 under `docs/media/`, referenced
-  from the README. The scenes must be reproducible from a documented command.
+**Cut — Phase 7, the Harvey–Liu haircut.** Redundant with DSR; see §5.6.
+
+**Merged — the standalone validation suite (old Phase 11).** Null calibration was
+never actually deferred to a final phase; it has been written inline from Phase 1
+onward, and each existing test is checked against simulation rather than against its
+own algebra: the Sharpe standard error against the spread of 2,000 simulated
+estimates, the Gumbel expected maximum against brute force for N ∈ {10, 50, 200,
+1000}, PBO against a 30-dataset ensemble null, and Phase 6's KS uniformity criterion.
+Rebuilding that as a separate tree would be filing, not work. The one genuinely new
+piece — documented power curves — becomes a handful of `slow`-marked tests in the
+existing unit files.
+
+**Merged — CLI into the report phase.** `luckdet mine` already exists; `demo` is
+mostly wiring, and it is the same work as making the report render.
+
+**Kept deliberately, despite being the weakest link:** the verdict layer. A tool that
+returns five numbers and no answer is unfinished. But its thresholds are invented
+rather than derived, and that should be said out loud in METHODS before a reader says
+it first. `PBO_THRESHOLD = 0.2` already sets the precedent: a named constant with an
+explicit note that it is a judgement call, not a convention from the literature.
 
 ## 7. The demo that sells the project
 
@@ -295,7 +316,6 @@ covers the ideas that prose handles badly. Decisions taken:
    - Deflated Sharpe Ratio ≈ 0.2 → cannot reject that this is the best of 500 coin flips
    - PBO ≈ 0.6 → the IS-best strategy underperforms the median OOS more often than not
    - Reality Check p ≈ 0.7 → the family as a whole beats buy-and-hold no better than chance
-   - Haircut Sharpe ≈ 0.4 → after multiplicity correction, the edge is gone
 5. **Verdict: LIKELY LUCK.**
 6. Then repeat on a synthetic strategy with a *real* planted edge and show the tool correctly
    returns **LIKELY SKILL** — proving it isn't just a machine that says "no" to everything.
@@ -311,11 +331,13 @@ That last step is the difference between a project that looks rigorous and one t
 
 ## 9. Definition of done
 
-- `pip install -e ".[dev]"` then `make test` passes from a clean clone on 3.10–3.12.
+- `pip install -e ".[dev]"` then `make test` passes from a clean clone on 3.10–3.14.
 - CI green, coverage ≥ 90% on `src/luckdetector/stats/`.
-- Every statistical routine has a null-calibration test in `tests/validation/`.
+- Every statistical routine has a null-calibration test in `tests/unit/`, checked
+  against simulation rather than against a re-transcription of its own formula.
 - README opens with the demo result and a figure, not with installation instructions.
-- `docs/METHODS.md` cites every paper implemented, with equation numbers.
+- `docs/METHODS.md` cites every paper implemented, and states plainly where a
+  threshold is a judgement call rather than a convention.
 
 ## 10. References
 

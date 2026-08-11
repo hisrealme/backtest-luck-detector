@@ -17,7 +17,7 @@ Three failure modes get conflated in practice. This tool separates them:
 | Failure mode | The question | Test |
 |---|---|---|
 | **Small-sample noise** | Is the record long enough to distinguish this Sharpe from zero, given fat tails? | Probabilistic Sharpe Ratio, Minimum Track Record Length |
-| **Selection bias** | Would the best of N random strategies have looked this good anyway? | Deflated Sharpe Ratio, White's Reality Check, Hansen's SPA, Harvey–Liu haircut |
+| **Selection bias** | Would the best of N random strategies have looked this good anyway? | Deflated Sharpe Ratio, White's Reality Check, Hansen's SPA |
 | **Overfitting** | Does the parameter set that won in-sample survive out-of-sample? | Probability of Backtest Overfitting via CSCV |
 
 ## What it does, on real data
@@ -77,8 +77,8 @@ winner that posted a 1.12 Sharpe.
 
 ## Status
 
-🚧 Under active construction. See [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md) for the full
-12-phase build plan and the mathematical specification.
+🚧 Under active construction. See [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md) for the
+build plan and the mathematical specification.
 
 - [x] Phase 0 — repo scaffolding, CI, lint/type gates
 - [x] Phase 1 — core data model, loaders, return moments
@@ -87,12 +87,14 @@ winner that posted a 1.12 Sharpe.
 - [x] Phase 4 — strategy mining engine
 - [x] Phase 5 — PBO via CSCV
 - [ ] Phase 6 — Reality Check / SPA
-- [ ] Phase 7 — Harvey–Liu haircut
-- [ ] Phase 8 — verdict aggregation
-- [ ] Phase 9 — plots + HTML report
-- [ ] Phase 10 — CLI *(`luckdet version` and `luckdet summary` work today; `report` / `mine` / `demo` pending)*
-- [ ] Phase 11 — statistical validation suite
-- [ ] Phase 12 — docs and release
+- [ ] Phase 7 — verdict aggregation
+- [ ] Phase 8 — plots, HTML report, CLI *(`luckdet version`, `summary` and `mine` work today; `report` / `demo` pending)*
+- [ ] Phase 9 — docs and release
+
+The plan was cut from twelve phases to nine after Phase 5 — the Harvey–Liu haircut
+is redundant with the Deflated Sharpe Ratio, null calibration already lives in the
+unit tests rather than waiting on a separate suite, and the animation layer cost more
+than it returned. [`BLUEPRINT.md §6a`](docs/BLUEPRINT.md) records the reasoning.
 
 ## Install
 
