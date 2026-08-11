@@ -29,6 +29,13 @@ from .moments import (
     summarize,
     volatility,
 )
+from .pbo import (
+    DegradationResult,
+    PBOResult,
+    contiguous_blocks,
+    performance_degradation,
+    probability_of_backtest_overfitting,
+)
 from .psr import (
     PSRResult,
     min_track_record_length,
@@ -39,10 +46,13 @@ from .psr import (
 __all__ = [
     "BootstrapResult",
     "DSRResult",
+    "DegradationResult",
     "MomentSummary",
+    "PBOResult",
     "PSRResult",
     "annualize_sharpe",
     "bootstrap_distribution",
+    "contiguous_blocks",
     "deannualize_sharpe",
     "deflated_sharpe_ratio",
     "deflated_sharpe_ratio_from_trials",
@@ -55,8 +65,10 @@ __all__ = [
     "min_track_record_length",
     "null_sharpe_std",
     "optimal_block_length",
+    "performance_degradation",
     "permutation_null",
     "probabilistic_sharpe_ratio",
+    "probability_of_backtest_overfitting",
     "sharpe_ratio",
     "sharpe_standard_error",
     "skewness",

@@ -27,6 +27,7 @@ from .exceptions import DataValidationError, InsufficientDataError
 
 FloatArray = npt.NDArray[np.float64]
 IntArray = npt.NDArray[np.int64]
+BoolArray = npt.NDArray[np.bool_]
 
 VerdictLabel = Literal["LIKELY_SKILL", "INCONCLUSIVE", "LIKELY_LUCK"]
 

@@ -85,7 +85,7 @@ winner that posted a 1.12 Sharpe.
 - [x] Phase 2 — PSR / DSR / MinTRL
 - [x] Phase 3 — bootstrap engine
 - [x] Phase 4 — strategy mining engine
-- [ ] Phase 5 — PBO via CSCV
+- [x] Phase 5 — PBO via CSCV
 - [ ] Phase 6 — Reality Check / SPA
 - [ ] Phase 7 — Harvey–Liu haircut
 - [ ] Phase 8 — verdict aggregation
