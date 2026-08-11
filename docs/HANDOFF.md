@@ -262,13 +262,24 @@ macOS system Python is 3.9 and will not work. Editable installs need pip ≥ 21.
 analysis without re-downloading. Reported numbers live in `README.md` and
 `docs/METHODS.md` so a stranger cloning the repo can still see them.
 
-**Note for agent sessions:** the sandbox mount may start without file-delete
-permission, which breaks *all* git write operations (git cannot clear `.git/index.lock`)
-and leaves a stale lock behind that blocks the user's own commands too. If `rm`
-returns "Operation not permitted", request delete access for the folder first rather
-than routing commits to the user. `mypy` in a sandbox may also lag the local
-numpy stubs — Phase 5 shipped a real annotation bug that only the local 3.14
-environment caught, so **always run `make check` locally before pushing**.
+### Notes for agent sessions — read before running anything
+
+**Enable file deletion for the folder as your first action, before any git command.**
+The sandbox mount can start without delete permission. Git cannot clear
+`.git/index.lock` without it, so *every* git write fails — and worse, even a plain
+`git status` creates a lock it then cannot remove, leaving a stale
+`.git/index.lock` that blocks the user's own commands until they delete it by hand.
+This cost real time in Phase 5. If a delete returns "Operation not permitted",
+request delete access for the folder rather than routing commits to the user. Use
+`git --no-optional-locks status` for read-only inspection if in doubt.
+
+**Do the committing.** Stage and commit the work yourself; the user should only ever
+need to run `git push`.
+
+**Sandbox `mypy` lags the local stubs.** Phase 5 shipped a real annotation bug — a
+bool mask typed as `FloatArray` — that passed on the sandbox's numpy 2.2 and failed
+on the local 3.14 environment. **Always tell the user to run `make check` locally
+before pushing**, and treat a green sandbox as necessary but not sufficient.
 
 ---
 
