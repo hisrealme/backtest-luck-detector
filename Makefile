@@ -26,4 +26,5 @@ demo:
 
 clean:
 	rm -rf .pytest_cache .mypy_cache .ruff_cache htmlcov .coverage build dist
-	find . -type d -name __pycache__ -exec rm -rf {} +
+	rm -f logs_*.zip
+	find . -type d -name __pycache__ -not -path "./.venv/*" -exec rm -rf {} +

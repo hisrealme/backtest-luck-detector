@@ -42,6 +42,8 @@ verdict, is what makes this a portfolio project.
 
 ## 3. Repository layout
 
+Entries marked *(planned)* do not exist yet. Everything else is built.
+
 ```
 backtest-luck-detector/
 ├── README.md                     # the shop window: problem, headline result, usage
@@ -49,8 +51,7 @@ backtest-luck-detector/
 ├── pyproject.toml                # deps, build, ruff/mypy/pytest config
 ├── Makefile                      # make install / test / lint / demo
 ├── .gitignore
-├── .pre-commit-config.yaml
-├── .github/workflows/ci.yml      # lint + typecheck + pytest on 3.10–3.12
+├── .github/workflows/ci.yml      # lint + typecheck + pytest on 3.10–3.14
 │
 ├── src/luckdetector/
 │   ├── __init__.py               # public API re-exports + __version__
@@ -73,7 +74,7 @@ backtest-luck-detector/
 │   │   ├── signals.py            # parameter grids: MA cross, momentum, RSI, breakout
 │   │   └── engine.py             # vectorised backtester → TrialMatrix
 │   │
-│   ├── report/
+│   ├── report/                   # (planned, Phases 7–8)
 │   │   ├── verdict.py            # rule table → Verdict + narrative
 │   │   ├── plots.py              # matplotlib figures
 │   │   └── html.py               # Jinja2 → single-file HTML report
@@ -81,12 +82,10 @@ backtest-luck-detector/
 │   └── cli.py                    # typer app
 │
 ├── tests/
-│   ├── unit/                     # one file per module; null calibration lives here too
-│   └── data/                     # small bundled fixtures
+│   └── unit/                     # one file per module; null calibration lives here too
 │
-├── examples/
-│   ├── 01_quickstart.ipynb
-│   └── 02_mining_demo.py         # mine 500 strategies on SPY, then indict them
+├── examples/                     # (planned, Phase 9)
+│   └── 01_quickstart.ipynb
 │
 └── docs/
     ├── BLUEPRINT.md              # this file
