@@ -127,7 +127,7 @@ build plan and the mathematical specification.
 - [x] Phase 5 — PBO via CSCV
 - [x] Phase 6 — Reality Check / SPA
 - [x] Phase 7 — verdict aggregation
-- [ ] Phase 8 — plots, HTML report, CLI *(`luckdet version`, `summary` and `mine` work today; `report` / `demo` pending)*
+- [x] Phase 8 — plots, HTML report, CLI *(`version`, `summary`, `mine`, `report`, `demo`)*
 - [ ] Phase 9 — docs and release
 
 The plan was cut from twelve phases to nine after Phase 5 — the Harvey–Liu haircut
@@ -224,8 +224,32 @@ prices. Point `mine()` at your own price series to judge your own backtests.
 From the command line:
 
 ```bash
-luckdet summary returns.csv --date-column date
+luckdet summary returns.csv --date-column date   # describe a track record
+luckdet mine SPY --start 2010-01-01              # mine a grid, deflate the winner
+luckdet report SPY --output spy.html             # all four tests, one HTML file
+luckdet demo                                     # the whole argument, end to end
 ```
+
+`luckdet demo` runs the machinery twice: on real prices, where it returns
+**LIKELY_LUCK**, and then on a family with a genuine edge planted in it, where it
+returns **LIKELY_SKILL**. Both halves are the demonstration — a tool that only ever
+says "luck" is indistinguishable from a pessimist. It writes one self-contained HTML
+report with both figures embedded as base64, no external CSS, no CDN and no
+JavaScript, so it opens correctly on a machine with no network.
+
+Data resolution is **cache, then download, then refuse**. If nothing is cached and the
+download is unavailable the command *fails* and points you at `luckdet demo --offline`,
+which runs on a synthetic path and labels every figure and every number `SYNTHETIC`. It
+will not quietly swap a random number generator in for a market.
+
+The second figure is worth a note, because the obvious version of it is misleading. On
+SPY the winner's 0.491 Sharpe is comfortably **above** the expected maximum of noise
+(0.309) — as are 43 of the 157 variants — while the Deflated Sharpe Ratio still calls it
+luck. The expected maximum is a point; the winner's Sharpe is an estimate with a
+standard error of 0.247. Allowing for it, 95% confidence needs a Sharpe of **0.715**, which
+the winner misses by 0.22 and which no variant in the grid reaches. The figure draws that
+bar, and shades the area that *is* the DSR. [`METHODS.md §11`](docs/METHODS.md) has the
+argument and the twelve-family measurement behind it.
 
 Loading from disk:
 

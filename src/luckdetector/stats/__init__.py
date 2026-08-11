@@ -15,6 +15,7 @@ from .dsr import (
     effective_number_of_trials,
     expected_max_sharpe,
     null_sharpe_std,
+    sharpe_required_for_dsr,
 )
 from .moments import (
     MomentSummary,
@@ -76,6 +77,7 @@ __all__ = [
     "probability_of_backtest_overfitting",
     "reality_check",
     "sharpe_ratio",
+    "sharpe_required_for_dsr",
     "sharpe_standard_error",
     "skewness",
     "summarize",

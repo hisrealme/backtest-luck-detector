@@ -1,11 +1,11 @@
 # Current state and next steps
 
-Written at the end of Phase 5, extended at the end of Phases 6 and 7. Read this before
-touching the code — it records the decisions that have already been argued out, so they
-don't get re-litigated, and it specifies the next phase precisely enough to implement
-from. **The next phase is 8, specified in §6.** Sections 4 and 5 are the closed records
-of Phases 6 and 7, kept because both specs turned out to contain errors worth
-remembering.
+Written at the end of Phase 5, extended at the end of Phases 6, 7 and 8. Read this
+before touching the code — it records the decisions that have already been argued out,
+so they don't get re-litigated, and it specifies the next phase precisely enough to
+implement from. **The next phase is 9, docs and release; see `BLUEPRINT.md`.**
+Sections 4, 5 and 6 are the closed records of Phases 6, 7 and 8, kept because all three
+specs turned out to contain errors worth remembering.
 
 ---
 
@@ -13,9 +13,9 @@ remembering.
 
 | | |
 |---|---|
-| Phases complete | 0–7 (scaffolding, core model, PSR/DSR, bootstrap, mining, PBO, RC/SPA, verdict) |
-| Commits | 23, all authored `hisrealme <315065552+hisrealme@users.noreply.github.com>` (the count in the Phase 5 handoff was stale — this one is `git rev-list --count HEAD`) |
-| Tests | 327 passing, 1 skipped (1 network test deselected), **97%** coverage |
+| Phases complete | 0–8 (scaffolding, core model, PSR/DSR, bootstrap, mining, PBO, RC/SPA, verdict, report/CLI) |
+| Commits | 25, all authored `hisrealme <315065552+hisrealme@users.noreply.github.com>` (check with `git rev-list --count HEAD`; this line has gone stale twice) |
+| Tests | 434 passing, 1 skipped (1 network test deselected), **97%** coverage |
 | Gates | `ruff` clean, `mypy --strict` clean |
 | CI | GitHub Actions, Python 3.10 / 3.11 / 3.12 / 3.13 / 3.14 — **green on the new repo** |
 | Repo | `github.com/hisrealme/backtest-luck-detector`, public |
@@ -42,10 +42,14 @@ src/luckdetector/
     ├── pbo.py          PBO via CSCV, degradation, dominance   ← Phase 5
     └── reality_check.py  White's RC + Hansen's SPA, 3 variants  ← Phase 6
 └── report/
-    └── verdict.py      rule table → Verdict + narrative       ← Phase 7
+    ├── verdict.py      rule table → Verdict + narrative       ← Phase 7
+    ├── analysis.py     TrialMatrix → 4 statistics + Verdict   ← Phase 8
+    ├── plots.py        2 figures, OO matplotlib, no pyplot    ← Phase 8
+    ├── html.py         one self-contained file, Jinja2        ← Phase 8
+    └── demo.py         data resolution + the two-half demo    ← Phase 8
 ```
 
-`docs/METHODS.md` now exists and covers phases 0–7. **Extend it in the same pass as
+`docs/METHODS.md` now exists and covers phases 0–8. **Extend it in the same pass as
 each new phase**, not afterwards — the reasoning is only cheap to write down while
 it is fresh.
 
@@ -322,7 +326,43 @@ before designing anything in Phase 8 that claims the tool "detects" edge.
 
 ---
 
-## 6. Phase 8 — Report + CLI (next)
+## 6. Phase 8 — Report + CLI — **DONE**
+
+> **Shipped in `report/analysis.py`, `report/plots.py`, `report/html.py`,
+> `report/demo.py` and two CLI commands. 87 new tests, 100% coverage on all four
+> modules bar one branch in `plots.py`.** The spec below is left as written so the
+> corrections stay legible. **One of its three "already taken" decisions was wrong**,
+> and one further error was introduced while implementing it:
+>
+> * **Figure 2 argued the opposite of the verdict.** The brief specified the trial
+>   Sharpes marked against the *expected maximum of noise* (0.309) and the winner
+>   (0.491), captioned "the winner sits inside the noise distribution". The winner is
+>   the argmax of the family by construction, so it is at the 100th percentile and
+>   can never sit inside it; and it is *above* 0.309, as are 43 of the 157 variants,
+>   so the drawn picture reads as a pass while DSR 0.7692 says luck. The bar DSR
+>   actually applies allows for the 0.2472 standard error on the winner's own Sharpe:
+>   **0.7152**, which the winner misses by 0.2246 and which no variant reaches.
+>   Added `stats.sharpe_required_for_dsr` (an exact inversion, not a new judgement)
+>   and drew that instead, shading the area that *is* the DSR. **Measured on twelve
+>   independently mined families — four seeds × three lengths — the geometry holds on
+>   all twelve**, so this is structural to any correlated family rather than a quirk
+>   of SPY. `test_the_misleading_geometry_is_structural_not_a_property_of_spy`.
+> * **The evidence table rendered the inapplicable SPA row as `p = 0.0000` vs
+>   `0.0500`.** `TestResult.statistic` holds *V_SPA* = 0 in that case, not a p-value,
+>   so formatting the row like the others turned the one cell with nothing to weigh
+>   into the most emphatic rejection in the document — the exact misreading the third
+>   state exists to prevent. Inapplicable rows now render an em dash in both cells.
+>   `test_renders_no_comparison_at_all_in_the_table`.
+>
+> The other two decisions — data resolution and report scope — were implemented as
+> written. One wrinkle in the first: `cache_path` keys on `(symbol, start, end)` and
+> `end` defaults to today, so an exact-key lookup misses a file written yesterday.
+> Resolution matches on symbol and start and takes the latest end.
+>
+> **SPY result.** `luckdet demo` reproduces every published figure exactly —
+> MA(80,250) at 0.491, DSR 0.7692, PBO 0.8396, 0 of 157 beating buy-and-hold,
+> **LIKELY_LUCK** — then returns **LIKELY_SKILL** on the planted-edge control, in
+> 1.3s total. Reasoning in `METHODS.md` §11.
 
 **Deliverable:** `report/plots.py`, `report/html.py`, and the CLI commands that drive
 them. Done when `luckdet demo` runs end to end from a clean install, produces one
@@ -349,6 +389,17 @@ output has to be unmistakable.
 2. *Distribution of all 157 trial Sharpes*, with the expected-max-of-noise hurdle
    (0.309) and the winner (0.491) marked on it. This is the whole thesis in one
    image: the winner sits inside the noise distribution.
+   > **Correction — this is the decision that was wrong, and both halves of it are.**
+   > The winner is the maximum of the plotted distribution by construction, so it is
+   > never "inside" it; and 0.491 > 0.309, along with 42 other variants, so marking
+   > those two lines shows the winner *clearing* the hurdle at the moment DSR calls
+   > it luck. The expected maximum is a point estimate; the winner's Sharpe is an
+   > estimate with a 0.2472 standard error, and 0.95 confidence needs
+   > 0.3086 + 1.645 × 0.2472 = **0.7152**. The figure now draws the null sampling
+   > distribution with the area below the winner shaded — that area *is* the DSR,
+   > 0.7692 — plus the 0.7152 bar, which nothing in the grid reaches. The histogram
+   > stays, since the dispersion of the family is what sets the hurdle, but it no
+   > longer carries a claim it cannot support. See `METHODS.md` §11.2.
 
 Snapshot-test them on **structure, not pixels** — number of axes, series lengths,
 labels, tick counts. Image hashes break on every matplotlib and font change and will
@@ -409,6 +460,16 @@ without it looking like the winner is far from the mass, when the point is that 
 that is not yet in METHODS. Phases 5, 6 and 7 each turned up a spec error; if Phase 8
 turns up none, that is more likely to mean the spec was vague than that it was right.
 
+> **Outcome: right about which part would be hard, wrong about why; right about the
+> spec error, and it found two.** The Sharpe-distribution figure was indeed the
+> fiddliest part — but the difficulty was not making the winner's distance from the
+> mass legible, it was that the winner is *not* inside the mass and no amount of
+> drafting could make it look as though it were. The premise of the prediction was
+> the thing that failed. The HTML itself was the easiest part, as forecast. The
+> caveat discovered while writing the template was not a new limitation but a
+> presentational one — §11.3's `p = 0.0000` row — which is arguably a weaker hit
+> than the prediction intended, and is recorded as such rather than rounded up.
+
 ---
 
 ## 7. Environment
@@ -423,10 +484,13 @@ Python 3.10 is the floor (`zip(strict=True)`, runtime `X | None` in typer signat
 macOS system Python is 3.9 and will not work. Editable installs need pip ≥ 21.3.
 
 `outputs/` holds the cached SPY CSV and the saved run summaries (`spy_run.txt`,
-`spy_pbo.txt`, `spy_rc_spa.txt`, `spy_verdict.txt`). It is gitignored — real prices
-stay local and are available for analysis without re-downloading. Reported numbers
-live in `README.md` and `docs/METHODS.md` so a stranger cloning the repo can still
-see them.
+`spy_pbo.txt`, `spy_rc_spa.txt`, `spy_verdict.txt`, and from Phase 8 `spy_demo.txt`
+and `spy_report.html`). It is gitignored — real prices stay local and are available
+for analysis without re-downloading. Reported numbers live in `README.md` and
+`docs/METHODS.md` so a stranger cloning the repo can still see them.
+
+`luckdet demo` searches `outputs/` before the user cache, so running it from the repo
+root picks up that CSV and needs no network.
 
 ### Notes for agent sessions — read before running anything
 
@@ -486,6 +550,15 @@ before pushing**, and treat a green sandbox as necessary but not sufficient.
     culprit: DSR's hurdle rises with the *dispersion* of trial Sharpes, so planting
     5 good variants scores better than planting 10 of the same quality. That is
     arguably correct, but it has not been examined.
+- **Known gaps in Phase 8**, both small:
+  - `luckdet report` and `luckdet demo` write the *real* half to HTML only. The
+    planted-edge control prints to the terminal and is not rendered. That matches
+    the brief ("one self-contained HTML file") but a second file, or both
+    assessments in one document, would make the control easier to point at.
+  - The remaining uncovered lines in `cli.py` are all in `mine`, which predates
+    this phase: its download branch and its error handler have no test because
+    nothing injects a downloader through that command. `report` covers the
+    equivalent path by stubbing `cli.load_prices`; `mine` could do the same.
 - **The phase plan was cut after Phase 5** — see `docs/BLUEPRINT.md` §6 and §6a. The
   Harvey–Liu haircut is dropped as redundant with DSR; the standalone validation
   suite is folded into `tests/unit/` where the calibration tests already live; the

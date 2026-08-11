@@ -13,6 +13,9 @@ from collections.abc import Callable
 import numpy as np
 import pytest
 
+from luckdetector.exceptions import DataValidationError
+from luckdetector.mining import mine, synthetic_prices
+from luckdetector.report.analysis import Analysis, analyse, analyse_mined
 from luckdetector.types import ReturnSeries, TrialMatrix
 
 SEED = 20260810
@@ -87,6 +90,23 @@ def rng() -> np.random.Generator:
 
 
 @pytest.fixture
+def no_network(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
+    """Make any attempted download fail immediately, as it would with no network.
+
+    Tests that exercise the *refusal* path need the download to be unavailable
+    deterministically. Relying on ``yfinance`` not being installed would make the
+    test pass for the wrong reason on a machine that has the ``[data]`` extra —
+    and pass by making a real network call on one that does not.
+    """
+
+    def unavailable(symbol: str, start: str, end: str) -> object:
+        raise DataValidationError(f"no network available for {symbol!r} in tests")
+
+    monkeypatch.setattr("luckdetector.io.prices.yfinance_downloader", unavailable)
+    return monkeypatch
+
+
+@pytest.fixture
 def make_exact_returns() -> Callable[..., np.ndarray]:
     """Factory fixture: returns with an exactly known realised Sharpe ratio."""
     return exact_sharpe_returns
@@ -139,4 +159,65 @@ def noise_trials() -> TrialMatrix:
         values=values,
         periods_per_year=252,
         labels=[f"noise_{i}" for i in range(200)],
+    )
+
+
+# --------------------------------------------------------------- report layer
+
+#: Both report fixtures are session-scoped. ``Analysis`` is frozen and every test
+#: that consumes one only reads from it, so re-mining a grid per test would buy
+#: nothing but wall-clock.
+
+
+@pytest.fixture(scope="session")
+def luck_analysis() -> Analysis:
+    """A **mined** family with no real edge: the report's LIKELY_LUCK path.
+
+    Mined rather than assembled from independent noise, and that is not
+    incidental. The geometry the report has to draw only exists in a
+    *correlated* family: 157 variants of four ideas collapse to about ten
+    effectively independent trials, which drops the expected-max-of-noise hurdle
+    well below the observed maximum and puts the winner above it while the
+    Deflated Sharpe Ratio still says luck. A matrix of independent trials does
+    the opposite — the winner lands *below* the expected max — and would hide
+    the very problem ``test_analysis.TestTheHurdleThatIsActuallyApplied``
+    exists to pin.
+
+    ``synthetic=False`` is a statement about the *report flag*, which is what
+    these tests exercise, not a claim about the prices. They are generated, and
+    no number from this fixture is ever reported.
+    """
+    result = mine(synthetic_prices(900, seed=3), cost_bps=1.0)
+    return analyse_mined(
+        result,
+        title="Mined grid, no real edge",
+        provenance="seeded synthetic path, 900 periods",
+        n_blocks=8,
+        n_resamples=200,
+        seed=1,
+    )
+
+
+@pytest.fixture(scope="session")
+def edge_analysis() -> Analysis:
+    """A family where a few variants really do have an edge, generously sized.
+
+    Matches the configuration ``report.demo`` uses and Phase 7 measured: the
+    verdict layer needs a large effect before it will say skill, and a fixture
+    built on a realistic one would be flaky rather than informative. See
+    ``test_verdict.test_detection_rate_at_a_realistic_edge_is_poor``.
+    """
+    values = generator(42).normal(0.0, DAILY_VOL, (50, 2520))
+    values[:5] += (3.0 / np.sqrt(252)) * DAILY_VOL
+    trials = TrialMatrix(
+        values, periods_per_year=252, labels=[f"variant_{i}" for i in range(50)]
+    )
+    return analyse(
+        trials,
+        title="Planted edge",
+        provenance="seeded edge",
+        synthetic=True,
+        n_blocks=8,
+        n_resamples=200,
+        seed=3,
     )

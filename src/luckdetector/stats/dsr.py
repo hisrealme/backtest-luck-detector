@@ -60,6 +60,7 @@ __all__ = [
     "effective_number_of_trials",
     "expected_max_sharpe",
     "null_sharpe_std",
+    "sharpe_required_for_dsr",
 ]
 
 #: Euler–Mascheroni constant, from the Gumbel limit of the maximum.
@@ -115,6 +116,52 @@ def null_sharpe_std(n_periods: int) -> float:
     if n_periods < 2:
         raise InsufficientDataError(f"Need at least 2 observations, got {n_periods}.")
     return 1.0 / math.sqrt(n_periods - 1)
+
+
+def sharpe_required_for_dsr(result: DSRResult, *, confidence: float = DSR_THRESHOLD) -> float:
+    """The annualised Sharpe this record needed in order to clear ``confidence``.
+
+    The inverse of the Deflated Sharpe Ratio, and the number the report layer
+    actually draws. It exists because the obvious thing to plot — the expected
+    maximum of noise — is **not** the bar DSR applies, and plotting it alone
+    argues the opposite of the test's own conclusion.
+
+    On SPY the expected maximum of noise is 0.31 and the winner posted 0.49, so a
+    figure marking only that hurdle shows the winner comfortably clearing it while
+    the DSR of 0.769 calls it luck. The reconciliation is that the hurdle is a
+    *point*, and the winner's Sharpe is an *estimate* with a standard error of
+    0.247: being 0.18 above the hurdle is only 0.74 standard errors above it, and
+    0.95 confidence needs 1.645. So the Sharpe actually required is
+
+    .. math::
+
+        SR_{req} = \\mathbb{E}[\\max SR_{noise}] + \\Phi^{-1}(c)\\,\\hat\\sigma(\\widehat{SR})
+
+    which on SPY is **0.715** — a bar the winner misses by 0.22, and one that no
+    variant in the family reaches.
+
+    The standard error is a property of the record alone, not of the benchmark it
+    is compared against, so this inversion is exact rather than an approximation:
+    substituting the result back into :func:`deflated_sharpe_ratio` returns
+    ``confidence`` to floating-point precision.
+
+    Parameters
+    ----------
+    result:
+        A computed :class:`DSRResult`.
+    confidence:
+        The bar to invert, defaulting to :data:`DSR_THRESHOLD`.
+
+    Returns
+    -------
+    float
+        Annualised Sharpe required. Compare against ``result.sharpe_annual``:
+        the record passes exactly when it is at or above this number.
+    """
+    if not 0.0 < confidence < 1.0:
+        raise ValueError(f"confidence must lie strictly between 0 and 1, got {confidence}.")
+    quantile = float(sps.norm.ppf(confidence))
+    return result.expected_max_sharpe_annual + quantile * result.psr_result.standard_error_annual
 
 
 def effective_number_of_trials(

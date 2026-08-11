@@ -17,11 +17,13 @@ import pytest
 from luckdetector.exceptions import InsufficientDataError
 from luckdetector.stats import moments
 from luckdetector.stats.dsr import (
+    DSR_THRESHOLD,
     deflated_sharpe_ratio,
     deflated_sharpe_ratio_from_trials,
     effective_number_of_trials,
     expected_max_sharpe,
     null_sharpe_std,
+    sharpe_required_for_dsr,
 )
 from luckdetector.stats.psr import probabilistic_sharpe_ratio
 from luckdetector.types import ReturnSeries, TrialMatrix
@@ -185,3 +187,65 @@ class TestDeflatedSharpeRatio:
         assert result.psr_result.benchmark_annual == pytest.approx(
             result.expected_max_sharpe_annual
         )
+
+
+class TestSharpeRequiredForDSR:
+    """Inverting DSR — the number the report draws, and why it is not the hurdle.
+
+    The Phase 8 brief specified a figure marking the *expected maximum of noise*
+    against the winner. That is the wrong bar: on SPY the winner clears it by
+    0.18 and is still called luck, because the hurdle is a point while the
+    winner's Sharpe is an estimate with a standard error of 0.247. This function
+    is the bar the test actually applies, and these tests pin the relationship
+    between the two.
+    """
+
+    def test_round_trips_through_the_statistic(self, noise_trials: TrialMatrix) -> None:
+        """Substituting the answer back in returns the confidence exactly."""
+        from scipy import stats as sps
+
+        result = deflated_sharpe_ratio_from_trials(noise_trials)
+        required = sharpe_required_for_dsr(result)
+        recovered = float(
+            sps.norm.cdf(
+                (required - result.expected_max_sharpe_annual)
+                / result.psr_result.standard_error_annual
+            )
+        )
+        assert recovered == pytest.approx(DSR_THRESHOLD, abs=1e-12)
+
+    def test_is_strictly_above_the_expected_maximum_of_noise(
+        self, noise_trials: TrialMatrix
+    ) -> None:
+        """The gap between the two is the standard error the figure has to show."""
+        result = deflated_sharpe_ratio_from_trials(noise_trials)
+        assert sharpe_required_for_dsr(result) > result.expected_max_sharpe_annual
+
+    def test_agrees_with_passed_in_both_directions(self, noise_trials: TrialMatrix) -> None:
+        """Clearing the drawn bar and passing DSR must be the same event."""
+        result = deflated_sharpe_ratio_from_trials(noise_trials)
+        clears = result.sharpe_annual >= sharpe_required_for_dsr(result)
+        assert clears == result.passed
+
+    def test_a_lower_confidence_is_a_lower_bar(self, noise_trials: TrialMatrix) -> None:
+        result = deflated_sharpe_ratio_from_trials(noise_trials)
+        assert sharpe_required_for_dsr(result, confidence=0.80) < sharpe_required_for_dsr(
+            result, confidence=0.95
+        )
+
+    def test_fifty_percent_confidence_is_exactly_the_expected_maximum(
+        self, noise_trials: TrialMatrix
+    ) -> None:
+        """A sanity anchor: the median of the null sits on the hurdle itself."""
+        result = deflated_sharpe_ratio_from_trials(noise_trials)
+        assert sharpe_required_for_dsr(result, confidence=0.5) == pytest.approx(
+            result.expected_max_sharpe_annual
+        )
+
+    @pytest.mark.parametrize("confidence", [0.0, 1.0, -0.1, 1.5])
+    def test_rejects_impossible_confidence(
+        self, noise_trials: TrialMatrix, confidence: float
+    ) -> None:
+        result = deflated_sharpe_ratio_from_trials(noise_trials)
+        with pytest.raises(ValueError, match="strictly between 0 and 1"):
+            sharpe_required_for_dsr(result, confidence=confidence)
