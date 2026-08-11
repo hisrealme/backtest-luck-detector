@@ -54,6 +54,8 @@ from __future__ import annotations
 
 import base64
 import io
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
 import numpy as np
@@ -89,20 +91,44 @@ COLOURS: dict[str, str] = {
 _FIGSIZE = (9.0, 4.8)
 _DPI = 110
 
-#: Figure type is set to match the report's body text rather than matplotlib's
-#: sans-serif default, since the two sit inches apart on the page. DejaVu Serif
-#: ships with matplotlib, so this adds no font dependency and cannot render
-#: differently in CI.
-_FONT: dict[str, Any] = {
-    "font.family": "serif",
-    "font.serif": ["DejaVu Serif"],
-    "mathtext.fontset": "dejavuserif",
-    "axes.labelsize": 10,
-    "axes.titlesize": 11,
-    "legend.fontsize": 8.5,
-    "xtick.labelsize": 9,
-    "ytick.labelsize": 9,
-}
+
+@contextmanager
+def _paper_type() -> Iterator[None]:
+    """Set figure type to match the report's body text, for the duration.
+
+    The report is set in a serif face and the figures sit inches from it, so
+    matplotlib's sans-serif default reads as a foreign object dropped into the
+    page. DejaVu Serif ships with matplotlib, which means this adds no font
+    dependency and cannot resolve differently in CI.
+
+    **The rc dict is written inline rather than hoisted to a module constant, and
+    that is not a style choice.** matplotlib 3.11 types ``rc_context``'s parameter
+    as a ``dict`` keyed by a ``Literal`` union of all ~300 rcParam names. A
+    constant annotated ``dict[str, Any]`` is not assignable to it — ``dict`` is
+    invariant in its key type — so hoisting it fails ``mypy --strict`` on every
+    Python that resolves matplotlib 3.11, while passing on 3.10, which caps at
+    matplotlib 3.10 and ships the looser ``dict[str, Any]`` signature. That is
+    exactly how it reached CI green locally and red on four of five jobs.
+
+    Passing the literal directly lets mypy check each key against whatever union
+    matplotlib currently declares, which type-checks under both signatures and
+    turns a future renamed rcParam into an error here rather than a silently
+    ignored setting. Annotating it ``dict[Any, Any]`` would also pass, but by
+    switching the check off rather than satisfying it.
+    """
+    with rc_context(
+        {
+            "font.family": "serif",
+            "font.serif": ["DejaVu Serif"],
+            "mathtext.fontset": "dejavuserif",
+            "axes.labelsize": 10,
+            "axes.titlesize": 11,
+            "legend.fontsize": 8.5,
+            "xtick.labelsize": 9,
+            "ytick.labelsize": 9,
+        }
+    ):
+        yield
 
 
 def _new_figure(synthetic: bool) -> tuple[Any, Any]:
@@ -152,7 +178,7 @@ def cumulative_return_figure(analysis: Analysis, *, title: bool = True) -> Any:
     caption. The default is ``True`` so the figure still stands on its own when
     it is used outside the report.
     """
-    with rc_context(_FONT):
+    with _paper_type():
         return _cumulative_return_figure(analysis, title=title)
 
 
@@ -211,7 +237,7 @@ def trial_sharpe_figure(analysis: Analysis, *, title: bool = True) -> Any:
 
     ``title=False`` drops the heading for use directly above a numbered caption.
     """
-    with rc_context(_FONT):
+    with _paper_type():
         return _trial_sharpe_figure(analysis, title=title)
 
 
