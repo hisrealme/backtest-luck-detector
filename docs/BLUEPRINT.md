@@ -1,6 +1,13 @@
 # Project 1 — The Backtest Luck-Detector
 
-**Blueprint v1.0**
+**Blueprint v1.0 — as built, at v0.1.0**
+
+Sections 0–9 are the plan, kept as written so the amendments in §6a stay legible.
+Sections 10–12 are the working record that used to live in a separate
+`HANDOFF.md`: the decisions already settled, the limitations already measured,
+and the two environment traps that have each cost the project a day. That file
+was for building; this one is for reading, and keeping two of them meant the
+reasoning lived in the wrong place.
 
 ---
 
@@ -42,14 +49,14 @@ verdict, is what makes this a portfolio project.
 
 ## 3. Repository layout
 
-Entries marked *(planned)* do not exist yet. Everything else is built.
+Everything below is built. As of v0.1.0 nothing in this tree is planned.
 
 ```
 backtest-luck-detector/
-├── README.md                     # the shop window: problem, headline result, usage
+├── README.md                     # the shop window: verdict and figures above the fold
 ├── LICENSE                       # MIT
 ├── pyproject.toml                # deps, build, ruff/mypy/pytest config
-├── Makefile                      # make install / test / lint / demo
+├── Makefile                      # make install / test / lint / demo / figures
 ├── .gitignore
 ├── .github/workflows/ci.yml      # lint + typecheck + pytest on 3.10–3.14
 │
@@ -74,23 +81,30 @@ backtest-luck-detector/
 │   │   ├── signals.py            # parameter grids: MA cross, momentum, RSI, breakout
 │   │   └── engine.py             # vectorised backtester → TrialMatrix
 │   │
-│   ├── report/                   # (planned, Phases 7–8)
+│   ├── report/
 │   │   ├── verdict.py            # rule table → Verdict + narrative
-│   │   ├── plots.py              # matplotlib figures
-│   │   └── html.py               # Jinja2 → single-file HTML report
+│   │   ├── analysis.py           # TrialMatrix → four statistics + Verdict
+│   │   ├── plots.py              # matplotlib figures, OO API, never pyplot
+│   │   ├── html.py               # Jinja2 → single-file HTML report
+│   │   └── demo.py               # data resolution + the two-half demo
 │   │
-│   └── cli.py                    # typer app
+│   └── cli.py                    # typer app: version/summary/mine/report/demo
 │
 ├── tests/
 │   └── unit/                     # one file per module; null calibration lives here too
 │
-├── examples/                     # (planned, Phase 9)
-│   └── 01_quickstart.ipynb
+├── scripts/
+│   └── make_readme_figures.py    # `make figures` — regenerates the two PNGs below
+│
+├── examples/
+│   └── 01_quickstart.ipynb       # SPY end to end, shipped with its outputs
 │
 └── docs/
     ├── BLUEPRINT.md              # this file
     ├── METHODS.md                # the maths, with citations
     └── figures/
+        ├── cumulative_return.png # committed: outputs/ is gitignored, so a
+        └── deflation_hurdle.png  # README figure has nowhere else to live
 ```
 
 ## 4. Core data model
@@ -264,6 +278,13 @@ Phase 9 rather than Phase 12. See §6a for what was cut and why.
 | 8 | Report + CLI | `report/plots.py`, `report/html.py`, `cli.py` | `luckdet demo` runs end-to-end from a clean install; single self-contained HTML; two figures, snapshot-tested |
 | 9 | Docs + publish | README, METHODS, notebook | Repo is legible to a stranger in 60 seconds; v0.1.0 tagged and pushed |
 
+**All ten are done.** v0.1.0 is the tag on Phase 9. Phase 9 itself: the two
+figures generated from real SPY prices and committed to `docs/figures/`, the
+README restructured so the verdict and both figures are above the fold, the
+quickstart notebook in `examples/`, the working handoff folded into §10–§12 of
+this document and deleted, and section 3 of the generated report fixed after it
+was read on a family that passes (`METHODS.md` §12.2).
+
 Power curves for each statistic are folded into `tests/unit/` alongside the
 calibration tests that already live there, marked `slow`. They are not a phase.
 
@@ -338,7 +359,170 @@ That last step is the difference between a project that looks rigorous and one t
 - `docs/METHODS.md` cites every paper implemented, and states plainly where a
   threshold is a judgement call rather than a convention.
 
-## 10. References
+## 10. Decisions already settled — do not re-open without a measurement
+
+These were argued out during Phases 1–8 and several of them cost real time to
+find. They lived in a working `HANDOFF.md` until v0.1.0; that file has been
+deleted and the durable parts are here, because this is where the project's
+reasoning already lives. The point of writing them down is that they stop being
+re-litigated — but each one is a claim about the code, so the way to overturn one
+is to show the measurement, not to prefer a different intuition.
+
+**Units.** Every public function takes and returns **annualised** Sharpe ratios
+and converts internally. PSR/DSR maths is per-period. Mixing them inflates
+significance by ~16× on daily data and is the classic bug in this literature.
+
+**Synthetic data is for tests, never for headlines.** Tests must not touch the
+network. Any *reported result* uses real prices. `synthetic_prices()` is honestly
+named and never dressed up as a ticker. **No market data is committed to this
+repository** — which is a constraint on the README, the notebook and the report
+as much as on the test suite, and §12.1 of `METHODS.md` records how each one
+lives within it.
+
+**Keep every trial, never just the winner.** `mine()` returns the whole family.
+PBO and Reality Check are impossible without it.
+
+**Validate against reality, not against the paper's algebra.** Every statistic is
+checked against simulation or a known null, never against a re-transcription of
+its own formula. The Sharpe standard error matches the empirical spread of 2,000
+simulated estimates within 5%; the Gumbel expected-maximum matches brute force
+within 6%; the CSCV subsample scorer matches naive concatenate-and-score to
+1.7e-16.
+
+**Seed everything.** Every stochastic routine takes an explicit `rng`/`seed`.
+Same seed, identical output.
+
+**Guard degenerate series.** `moments.is_effectively_constant` exists because
+`np.std` of identical values returns ~2e-19, not 0.0. Any new routine that
+divides by a dispersion measure must gate on it.
+
+**Test fixtures draw from one seeded stream per batch.** Seeding each row with
+consecutive seeds gives measurably under-dispersed extremes. Use `make_trials` /
+`make_exact_returns` in `tests/conftest.py`.
+
+**Reduce resampling to a matrix product.** The Sharpe of any union of blocks
+depends only on per-block count, sum and sum-of-squares, so 12,870 CSCV splits
+collapse into two matmuls against an `(n_splits, S)` membership matrix — the full
+SPY grid in 0.04s. The same trick carries the Reality Check's 1,000 replicates.
+Do not write a Python loop over resamples.
+
+**Centre before using the** `E[x²] − E[x]²` **identity.** The raw form loses
+precision to catastrophic cancellation; centring on the full-sample mean shrinks
+the subtracted term by a factor of the subsample length and makes it harmless.
+
+**A negative in-sample/out-of-sample slope means nothing.** The two halves of a
+split *partition a fixed total*, so `mean_OOS ≈ mean_total − mean_IS` and the
+slope is pinned near −1 before any selection happens — measured at **−0.999** on
+a fixed trial with no selection at all. Noise gives −0.82; a planted genuine edge
+gives −0.69. It does not discriminate, and
+`test_fixed_trial_slope_is_minus_one` exists to stop it being "fixed" into
+significance. `probability_of_loss` and `dominance_fraction` are the companions
+that do work.
+
+**A single PBO estimate is noisy.** Across 30 independent zero-edge datasets
+(N = 50, T = 1260, S = 16): mean 0.505, **sd 0.153**, range 0.23–0.80. The 12,870
+splits are heavily dependent. Any test of a null value must average over
+datasets, never assert on one draw, or it passes and fails on the seed.
+
+**Reuse one set of bootstrap indices across every strategy** in the Reality
+Check. Resampling each independently destroys the cross-sectional dependence that
+makes `max_k` meaningful. Note the direction, which the Phase 6 brief had
+backwards: a mined family is mostly *positively* correlated, so independent
+resampling prices 157 near-duplicates as 157 separate bets and returns p-values
+that are too **large**. It costs power rather than manufacturing significance.
+
+## 11. Known limitations, measured
+
+Every item here was measured rather than suspected, and each ships in the caveats
+of every generated report. None is a defect to be quietly fixed before release;
+three of them are properties of the method that a reader is entitled to know.
+
+- **CSCV has no purge or embargo.** With S = 16 and T = 4,173 each block is ~261
+  days, so a 250-day-lookback rule is contaminated near each seam. This makes the
+  winner look *more* persistent than it is, so the true PBO is likely worse than
+  0.84, not better. A purged variant is the obvious extension, and v0.1.0 ships
+  with the gap open and documented rather than with statistical work started in a
+  release phase.
+- **SPA does not protect against pruning the family.** It defends against
+  *padding* with obvious garbage; *deleting* the merely-bad variants after seeing
+  the results defeats both tests equally. On the real SPY family against zero,
+  pruning 157 → best 16 moves RC 0.242 → 0.068 and SPA 0.411 → 0.065, with
+  nothing recentred at any stage. The same honest-book-keeping dependence DSR has
+  and PBO does not.
+- **"SPA ≥ RC power" is not a universal domination.** It holds in the case SPA
+  was designed for — a real edge buried among genuinely bad strategies — and the
+  test asserts it there. On SPY against zero it fails (RC 0.24, SPA 0.43) because
+  none of the 157 falls below Hansen's cutoff, so only the studentisation is in
+  play. Do not quote it as a general property.
+- **The verdict layer has poor power on the skill side.** The SPY *luck* verdict
+  is robust to any defensible threshold: DSR flags above 0.77, PBO below 0.84,
+  and one flag suffices. The skill side is weak. Across 25 independent datasets,
+  a genuine annualised Sharpe of 2.0 planted in 10 of 50 variants over five years
+  is called LIKELY_SKILL only **20%** of the time; it takes 5 of 50 at Sharpe 3.0
+  over ten years to reach 100%. **DSR is the binding constraint at every effect
+  size** — PBO returns 0.000 and SPA rejects throughout. So LIKELY_LUCK is weak
+  evidence of absence. `test_detection_rate_at_a_realistic_edge_is_poor` pins the
+  figure so it cannot drift or be quietly threshold-tuned away. Do not "fix" this
+  by lowering `DSR_THRESHOLD`: the conservatism is the instrument working, and
+  the honest response is the caveat, not a friendlier bar.
+  - Not yet examined: whether the effective-trial count is the real culprit. DSR's
+    hurdle rises with the *dispersion* of trial Sharpes, so planting 5 good
+    variants scores better than planting 10 of the same quality. That is arguably
+    correct, but nobody has looked.
+- **Two small gaps in the report layer.** `luckdet report` and `luckdet demo`
+  write the *real* half to HTML only — the planted-edge control prints to the
+  terminal and is not rendered. And the uncovered lines in `cli.py` are all in
+  `mine`, which predates the report phase: its download branch and error handler
+  have no test because nothing injects a downloader through that command.
+  `report` covers the equivalent path by stubbing `cli.load_prices`; `mine` could
+  do the same.
+
+## 12. Environment, and two traps worth knowing about
+
+```bash
+cd ~/Documents/"Project 1"           # the quotes matter
+source .venv/bin/activate            # Python 3.14
+make check                           # ruff + mypy + pytest
+```
+
+Python 3.10 is the floor (`zip(strict=True)`, runtime `X | None` in typer
+signatures). macOS system Python is 3.9 and will not work. Editable installs need
+pip ≥ 21.3.
+
+`outputs/` holds the cached SPY CSV and the saved run summaries. It is
+gitignored: real prices stay local and stay available for analysis without
+re-downloading, while nothing generated there reaches a reader who clones the
+repo. That is why the two README figures are committed to `docs/figures/` and why
+the reported numbers live in `README.md` and `docs/METHODS.md`. `luckdet demo`
+searches `outputs/` before the user cache, so running it from the repo root picks
+up that CSV and needs no network.
+
+**A green local run is necessary and not sufficient — the matrix is the gate.**
+CI runs 3.10 through 3.14 and dependencies resolve to different versions per
+interpreter, so a single interpreter is structurally incapable of seeing part of
+the matrix. This has bitten the project twice. Phase 5 shipped an annotation bug
+that passed on numpy 2.2 and failed on 3.14. Phase 8 shipped a `mypy --strict`
+failure that passed on the 3.10 job and failed on the other four, because
+matplotlib 3.11 dropped Python 3.10 — 3.10 resolves matplotlib 3.10.9 with a
+loose signature while 3.11+ resolve 3.11.1 with a strict one. numpy splits the
+same way: numpy 2.3 requires 3.11+, so a 3.10 environment never typechecks
+against the newer stubs. `METHODS.md` §11.5 has the full account. The rule it
+implies: **where a dependency's stubs vary across the supported range, prefer the
+form that lets the dependency's own types do the checking over the form that
+asserts a type of your own.** And run `make check` locally before pushing, then
+wait for the matrix before tagging.
+
+**Agent sessions: enable file deletion for the folder before any git command.**
+A sandbox mount can start without delete permission, and git cannot clear
+`.git/index.lock` without it — so every git write fails, and worse, even a plain
+`git status` creates a lock it then cannot remove, blocking the user's own
+commands until they delete it by hand. This cost real time in Phase 5. If a
+delete returns "Operation not permitted", request delete access rather than
+routing commits back to the user; `git --no-optional-locks status` is the safe
+read-only inspection in the meantime. And do the committing — the user should
+only ever need to run `git push`.
+
+## 13. References
 
 - Bailey, D. & López de Prado, M. (2012). *The Sharpe Ratio Efficient Frontier.* J. Risk.
 - Bailey, D. & López de Prado, M. (2014). *The Deflated Sharpe Ratio.* J. Portfolio Management.

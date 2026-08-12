@@ -2,13 +2,53 @@
 
 **How much of your backtest is luck?**
 
-`luckdetector` takes a trading strategy's track record — ideally along with every
-variant you tried before settling on it — and estimates how much of the reported
-performance is explained by chance and selection bias rather than genuine edge.
+Mine 157 trading strategies over sixteen years of SPY. Keep the best one, exactly as
+any backtester would. Then ask whether it is real.
 
-> A backtest is a *maximum*, not a sample mean. Nobody publishes the first strategy
-> they tried; they publish the best of the several hundred they tried. The reported
-> Sharpe ratio is an order statistic, and the ordinary t-test is invalid on it.
+```
+$ luckdet demo
+
+SPY, 2010-01-04 to 2026-08-07 · 4,174 closes · 157 strategies mined
+Winner: MA(80,250) — annualised Sharpe 0.491, total return +205.6%
+
+  [PASS]  Probabilistic Sharpe Ratio            0.9764   ← the naive test passes
+  [FAIL]  Deflated Sharpe Ratio                 0.7692   needs ≥ 0.95
+  [FAIL]  Probability of Backtest Overfitting   0.8396   needs ≤ 0.20
+  [ — ]   Reality Check / SPA                   not one of the 157 beat buy-and-hold
+
+VERDICT: LIKELY LUCK
+```
+
+**Why.** Because 157 variants were tried, the winner needed a Sharpe of **0.715** to be
+credible. It posted **0.491** — and buy-and-hold, doing nothing at all, returned
+**+814.3%** against its +205.6%, with a smaller drawdown.
+
+![Cumulative return: MA(80,250) at +205.6% against buy-and-hold at +814.3%, log scale](docs/figures/cumulative_return.png)
+
+<sub>**Figure 1.** The reported winner against doing nothing. Sixteen years of work to
+finish 609 percentage points behind the thing you could have bought on day one.</sub>
+
+![The winner's Sharpe of 0.491 against the 0.715 it needed, with the deflated Sharpe ratio shaded](docs/figures/deflation_hurdle.png)
+
+<sub>**Figure 2.** The winner clears the expected maximum of noise (0.309) — so do 43 of
+the 157 variants — but that is not the bar the test applies. Allowing for the 0.247
+standard error on its own Sharpe, 95% confidence needs 0.715. The shaded area *is* the
+Deflated Sharpe Ratio, 0.7692.</sub>
+
+And it is not a machine that says no: plant a genuine edge in 5 of 50 variants and the
+same machinery returns **LIKELY SKILL**, with zero flags. That control is the second half
+of `luckdet demo` and it is in the test suite, because a luck detector that never finds
+skill is a rubber stamp.
+
+```bash
+pip install -e ".[dev,data]"
+luckdet demo                      # the whole argument, end to end
+```
+
+Run it on your own symbol — `luckdet report AAPL --output aapl.html` — or read the
+[quickstart notebook](examples/01_quickstart.ipynb), which does the above cell by cell.
+
+---
 
 ## What it measures
 
@@ -20,89 +60,46 @@ Three failure modes get conflated in practice. This tool separates them:
 | **Selection bias** | Would the best of N random strategies have looked this good anyway? | Deflated Sharpe Ratio, White's Reality Check, Hansen's SPA |
 | **Overfitting** | Does the parameter set that won in-sample survive out-of-sample? | Probability of Backtest Overfitting via CSCV |
 
-## What it does, on real data
+> A backtest is a *maximum*, not a sample mean. Nobody publishes the first strategy they
+> tried; they publish the best of the several hundred they tried. The reported Sharpe
+> ratio is an order statistic, and the ordinary t-test is invalid on it.
 
-Mine 157 moving-average, momentum, RSI and breakout variants over **SPY, 2010-01-04
-to 2026-08-07** — 4,174 trading days. Keep the best one, exactly as any backtester
-would.
-
-```
-$ luckdet mine SPY --start 2010-01-01
-
-SPY, 2010-01-04 to 2026-08-07 (cache)
-Mined 157 strategies; buy-and-hold Sharpe 0.867
-
-           Winner: MA(80,250)
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┓
-┃ Statistic                    ┃  Value ┃
-┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━┩
-│ Annualised Sharpe            │  0.491 │
-│ Total return                 │ 205.6% │
-│ Max drawdown                 │ -40.3% │
-│ Naive PSR vs zero            │ 0.9764 │
-│ Trials run                   │    157 │
-│ Effectively independent      │     12 │
-│ Expected max Sharpe of noise │  0.309 │
-│ Deflated Sharpe Ratio        │ 0.7692 │
-└──────────────────────────────┴────────┘
-VERDICT: likely luck
-```
+## The SPY result in full
 
 Two findings, and the second is the one that matters.
 
 **The winner fails deflation.** A Sharpe of 0.491 with a 97.6% probabilistic Sharpe
-ratio looks significant. But 157 variants cluster into ~12 independent bets, the best
-of pure noise would be expected to score 0.309 anyway, and the honest probability the
-edge is real is 76.9% — under the 95% bar.
+ratio looks significant. But 157 variants cluster into ~12 independent bets, the best of
+pure noise would be expected to score 0.309 anyway, and the honest probability the edge
+is real is 76.9% — under the 95% bar.
 
-**Not one of the 157 beat buy-and-hold.** Zero. Buy-and-hold returned 814.3% at a
-Sharpe of 0.867 with a *smaller* drawdown (-33.7% against the winner's -40.3%). The
-winner's return stream minus buy-and-hold's has an annualised Sharpe of **-0.416**.
-The entire exercise destroyed value, and 26 of the variants (17%) posted a negative
-Sharpe outright.
+**Not one of the 157 beat buy-and-hold.** Zero. Buy-and-hold returned 814.3% at a Sharpe
+of 0.867 with a *smaller* drawdown (-33.7% against the winner's -40.3%). The winner's
+return stream minus buy-and-hold's has an annualised Sharpe of **-0.416**. The entire
+exercise destroyed value, and 26 of the variants (17%) posted a negative Sharpe outright.
 
-Three more tests agree, and they disagree about *how* damning it is:
+Four tests agree, and they disagree about *how* damning it is:
 
 | Test | Result | Reading |
 |---|---|---|
+| Probabilistic Sharpe Ratio | 0.9764 | the record is long enough — and that is all it says |
 | Deflated Sharpe Ratio | 0.7692 | probably luck |
 | PBO via CSCV, 12,870 splits | 0.8396 | selection is worse than picking at random |
 | Reality Check / SPA vs buy-and-hold | p = 1.0000 | nothing in the family to test |
 | Reality Check / SPA vs zero | p = 0.24 / 0.43 | not significant even against the soft benchmark |
 
-The same 157 strategies score p = 0.24 against zero and p = 1.00 against
-buy-and-hold. **The benchmark is the question**, and a write-up that reports only
-the first has not stated a single false number.
+The same 157 strategies score p = 0.24 against zero and p = 1.00 against buy-and-hold.
+**The benchmark is the question**, and a write-up that reports only the first has not
+stated a single false number.
 
-Put the four together and the tool returns one answer:
-
-```
-LIKELY LUCK — at least one test that knows a search took place objected.
-
-  [PASS]           Probabilistic Sharpe Ratio            0.9764
-  [FAIL]           Deflated Sharpe Ratio                 0.7692
-  [FAIL]           Probability of Backtest Overfitting   0.8396
-  [NOT_APPLICABLE] Reality Check / SPA                   no variant beat the benchmark
-```
-
-Read the first line twice. **The naive test passes.** A backtester who computed a
-Probabilistic Sharpe Ratio, got 97.6%, and stopped would have concluded the record
-was sound. Every test that knows a search took place disagrees.
-
-And it is not a machine that says no: run the same rule table on 50 synthetic
-variants of which 5 carry a genuine annualised Sharpe of 3.0, and it returns
-**LIKELY SKILL** with zero flags. That test is in the suite, because a luck
-detector that never finds skill is a rubber stamp.
+Read the PSR row twice. **The naive test passes.** A backtester who computed a
+Probabilistic Sharpe Ratio, got 97.6%, and stopped would have concluded the record was
+sound. Every test that knows a search took place disagrees.
 
 It is a *conservative* instrument, though, and [`METHODS.md`](docs/METHODS.md) §9
-measures exactly how conservative rather than leaving you to find out: a real,
-persistent Sharpe of 2.0 in 10 of 50 variants over five years is recognised as
-skill only about one time in five. A luck verdict is much weaker evidence of
-absence than it sounds.
-
-That is the whole thesis in one table. A backtester who reported only MA(80,250) would
-show you 205% cumulative and a significant t-statistic, while quietly having lost to
-doing nothing at all for sixteen years.
+measures exactly how conservative rather than leaving you to find out: a real, persistent
+Sharpe of 2.0 in 10 of 50 variants over five years is recognised as skill only about one
+time in five. A luck verdict is much weaker evidence of absence than it sounds.
 
 <sub>**Caveat, stated because it matters:** 2010–2026 was a historic bull market, and
 trend rules that go flat or short necessarily give up ground in a relentless uptrend.
@@ -110,36 +107,10 @@ This is evidence about *this* strategy family over *this* period, not a universa
 about trend following. Run `luckdet mine` on your own symbol and window — the tool has
 no stake in the answer.</sub>
 
-Run against 200 strategies with *literally zero* edge planted in any of them, the same
-machinery returns a deflated ratio of 0.31, correctly refusing to be impressed by a
-winner that posted a 1.12 Sharpe.
-
-## Status
-
-🚧 Under active construction. See [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md) for the
-build plan and the mathematical specification.
-
-- [x] Phase 0 — repo scaffolding, CI, lint/type gates
-- [x] Phase 1 — core data model, loaders, return moments
-- [x] Phase 2 — PSR / DSR / MinTRL
-- [x] Phase 3 — bootstrap engine
-- [x] Phase 4 — strategy mining engine
-- [x] Phase 5 — PBO via CSCV
-- [x] Phase 6 — Reality Check / SPA
-- [x] Phase 7 — verdict aggregation
-- [x] Phase 8 — plots, HTML report, CLI *(`version`, `summary`, `mine`, `report`, `demo`)*
-- [ ] Phase 9 — docs and release
-
-The plan was cut from twelve phases to nine after Phase 5 — the Harvey–Liu haircut
-is redundant with the Deflated Sharpe Ratio, null calibration already lives in the
-unit tests rather than waiting on a separate suite, and the animation layer cost more
-than it returned. [`BLUEPRINT.md §6a`](docs/BLUEPRINT.md) records the reasoning.
-
 ## Install
 
 Requires **Python 3.10 or later**; tested through 3.14. macOS ships 3.9, which is
-end-of-life — check with
-`python3 --version` and install a current build from
+end-of-life — check with `python3 --version` and install a current build from
 [python.org](https://www.python.org/downloads/) if needed.
 
 ```bash
@@ -151,7 +122,7 @@ make install                             # pip install -e ".[dev,data]"
 make check                               # lint + typecheck + tests
 ```
 
-## Usage (current)
+## Usage
 
 ```python
 import numpy as np
@@ -171,8 +142,8 @@ min_track_record_length(returns) / 252                # ...if not, how long?
 deflated_sharpe_ratio(returns, n_trials=200)          # would 200 coin flips beat it?
 ```
 
-If you kept every variant you tried — and you should — hand over the whole family
-and let the tool measure the trial count and their correlation itself:
+If you kept every variant you tried — and you should — hand over the whole family and
+let the tool measure the trial count and their correlation itself:
 
 ```python
 trials = TrialMatrix(all_my_backtests, periods_per_year=252)
@@ -189,8 +160,8 @@ result = mine(synthetic_prices(3780, seed=42), cost_bps=1.0)   # 157 variants, 1
 print(deflated_sharpe_ratio_from_trials(result.trials).interpretation)
 ```
 
-Then ask the two harder questions — does the in-sample winner survive out-of-sample,
-and did any variant beat the thing you could have done instead?
+Then ask the two harder questions — does the in-sample winner survive out-of-sample, and
+did any variant beat the thing you could have done instead?
 
 ```python
 from luckdetector.stats import probability_of_backtest_overfitting, reality_check
@@ -214,42 +185,12 @@ print(verdict.narrative)                                # ...and which test obje
 ```
 
 Every argument is optional and a missing test is never treated as a passing one — a
-verdict built on less evidence says so. The thresholds and the combination rules are
-laid out, and argued with, in [`docs/METHODS.md`](docs/METHODS.md) §9.
+verdict built on less evidence says so. The thresholds and the combination rules are laid
+out, and argued with, in [`docs/METHODS.md`](docs/METHODS.md) §9.
 
-`synthetic_prices` is exactly what it says: a GARCH-like path with realistic
-volatility clustering. Nothing here ships fabricated market data dressed up as real
-prices. Point `mine()` at your own price series to judge your own backtests.
-
-From the command line:
-
-```bash
-luckdet summary returns.csv --date-column date   # describe a track record
-luckdet mine SPY --start 2010-01-01              # mine a grid, deflate the winner
-luckdet report SPY --output spy.html             # all four tests, one HTML file
-luckdet demo                                     # the whole argument, end to end
-```
-
-`luckdet demo` runs the machinery twice: on real prices, where it returns
-**LIKELY_LUCK**, and then on a family with a genuine edge planted in it, where it
-returns **LIKELY_SKILL**. Both halves are the demonstration — a tool that only ever
-says "luck" is indistinguishable from a pessimist. It writes one self-contained HTML
-report with both figures embedded as base64, no external CSS, no CDN and no
-JavaScript, so it opens correctly on a machine with no network.
-
-Data resolution is **cache, then download, then refuse**. If nothing is cached and the
-download is unavailable the command *fails* and points you at `luckdet demo --offline`,
-which runs on a synthetic path and labels every figure and every number `SYNTHETIC`. It
-will not quietly swap a random number generator in for a market.
-
-The second figure is worth a note, because the obvious version of it is misleading. On
-SPY the winner's 0.491 Sharpe is comfortably **above** the expected maximum of noise
-(0.309) — as are 43 of the 157 variants — while the Deflated Sharpe Ratio still calls it
-luck. The expected maximum is a point; the winner's Sharpe is an estimate with a
-standard error of 0.247. Allowing for it, 95% confidence needs a Sharpe of **0.715**, which
-the winner misses by 0.22 and which no variant in the grid reaches. The figure draws that
-bar, and shades the area that *is* the DSR. [`METHODS.md §11`](docs/METHODS.md) has the
-argument and the twelve-family measurement behind it.
+`synthetic_prices` is exactly what it says: a GARCH-like path with realistic volatility
+clustering. Nothing here ships fabricated market data dressed up as real prices. Point
+`mine()` at your own price series to judge your own backtests.
 
 Loading from disk:
 
@@ -260,15 +201,74 @@ track_record = load_returns_csv("returns.csv", date_column="date")
 every_variant = load_trials_csv("trials.csv", date_column="date")  # the strong input
 ```
 
+### From the command line
+
+```bash
+luckdet summary returns.csv --date-column date   # describe a track record
+luckdet mine SPY --start 2010-01-01              # mine a grid, deflate the winner
+luckdet report SPY --output spy.html             # all four tests, one HTML file
+luckdet demo                                     # the whole argument, end to end
+```
+
+`luckdet demo` runs the machinery twice: on real prices, where it returns
+**LIKELY_LUCK**, and then on a family with a genuine edge planted in it, where it returns
+**LIKELY_SKILL**. It writes one self-contained HTML report with both figures embedded as
+base64, no external CSS, no CDN and no JavaScript, so it opens correctly on a machine
+with no network.
+
+Data resolution is **cache, then download, then refuse**. If nothing is cached and the
+download is unavailable the command *fails* and points you at `luckdet demo --offline`,
+which runs on a synthetic path and labels every figure and every number `SYNTHETIC`. It
+will not quietly swap a random number generator in for a market.
+
 ## Design principles
 
-1. **Every number is falsifiable.** Each statistic is validated against a known null
-   or a published reference value in the test suite.
-2. **No network in tests.** Market data is cached and a bundled fixture backs CI.
+1. **Every number is falsifiable.** Each statistic is validated against a known null or a
+   published reference value in the test suite — never against a re-transcription of its
+   own formula.
+2. **No network in tests, and no market data in the repository.** CI is deterministic and
+   offline.
 3. **Seeded everywhere.** Same seed, byte-identical report.
 4. **Library first, CLI second.** No statistics live in user-facing code.
-5. **Honest verdicts.** No black-box composite score — a transparent rule table where
-   each test can independently raise a flag, and the report says which one fired.
+5. **Honest verdicts.** No black-box composite score — a transparent rule table where each
+   test can independently raise a flag, and the report says which one fired.
+
+## Status
+
+**v0.1.0** — the first release. All nine build phases are complete; 469 tests, 97%
+coverage, `ruff` and `mypy --strict` clean on Python 3.10 through 3.14.
+
+- [x] Phase 0 — repo scaffolding, CI, lint/type gates
+- [x] Phase 1 — core data model, loaders, return moments
+- [x] Phase 2 — PSR / DSR / MinTRL
+- [x] Phase 3 — bootstrap engine
+- [x] Phase 4 — strategy mining engine
+- [x] Phase 5 — PBO via CSCV
+- [x] Phase 6 — Reality Check / SPA
+- [x] Phase 7 — verdict aggregation
+- [x] Phase 8 — plots, HTML report, CLI *(`version`, `summary`, `mine`, `report`, `demo`)*
+- [x] Phase 9 — docs, notebook, release
+
+Alpha in the sense that the API may still move, not in the sense that the numbers are
+provisional. The known limitations are measured rather than suspected, and they are
+listed in [`BLUEPRINT.md §11`](docs/BLUEPRINT.md) and repeated in the caveats of every
+report the tool generates — most importantly that CSCV here has no purge or embargo,
+which makes the reported 0.84 an *optimistic* estimate of overfitting rather than a
+pessimistic one.
+
+The plan was cut from twelve phases to nine after Phase 5 — the Harvey–Liu haircut is
+redundant with the Deflated Sharpe Ratio, null calibration already lives in the unit tests
+rather than waiting on a separate suite, and the animation layer cost more than it
+returned. [`BLUEPRINT.md §6a`](docs/BLUEPRINT.md) records the reasoning.
+
+## Documentation
+
+- [`docs/METHODS.md`](docs/METHODS.md) — the mathematics, with citations, and a plainly
+  marked list of every place a threshold is a judgement call rather than a convention.
+- [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md) — the design, the phase plan, the decisions
+  that are settled and the limitations that are measured.
+- [`examples/01_quickstart.ipynb`](examples/01_quickstart.ipynb) — the SPY result end to
+  end, shipped with its outputs so it reads without being run.
 
 ## References
 

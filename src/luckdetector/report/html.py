@@ -46,6 +46,7 @@ from pathlib import Path
 from typing import Any
 
 from jinja2 import Environment
+from scipy import stats as sps
 
 from ..stats.dsr import DSR_THRESHOLD
 from ..types import TestResult
@@ -104,6 +105,11 @@ _STATUS_STYLE: dict[str, tuple[str, str, str]] = {
     "FAIL": ("fail", "flagged", "flagged"),
     "NOT_APPLICABLE": ("na", "not applicable", "not applicable"),
 }
+
+#: One-sided normal quantile at :data:`DSR_THRESHOLD`, quoted in section 3 as the
+#: number of standard errors 0.95 confidence asks for. Named rather than written
+#: as ``1.64`` in a string so it cannot drift from the threshold it belongs to.
+_CONFIDENCE_Z: float = float(sps.norm.ppf(DSR_THRESHOLD))
 
 _VERDICT_STYLE: dict[str, tuple[str, str]] = {
     "LIKELY_LUCK": ("luck", "This backtest is most likely luck."),
@@ -456,21 +462,80 @@ def _prose(analysis: Analysis) -> dict[str, str]:
         f"selection stability, and the benchmark — so a single objection is not outvoted by "
         f"the others."
     )
-    gap = analysis.winner_sharpe - analysis.dsr_hurdle
+    return {"search": search, "evidence": evidence, "hurdle": _hurdle_paragraph(analysis)}
+
+
+def _hurdle_paragraph(analysis: Analysis) -> str:
+    """Section 3: why the obvious bar is not the bar, and where the winner landed.
+
+    Every clause that depends on the sign of a difference is branched, because
+    the first version of this paragraph was written against SPY and read as
+    nonsense anywhere else. Two clauses in particular:
+
+    *"and it is the wrong one"* invited a reversal that only arrives when the
+    winner sits *between* the two bars. On a family that clears both, the
+    expected maximum is not wrong, merely insufficient, and a paragraph that
+    announces an objection and then fails to make one reads as though the
+    verdict had been overturned somewhere the reader missed.
+
+    *"is worth only N standard errors, where 95% confidence needs 1.64"* is a
+    contradiction whenever N exceeds 1.64 — on the planted-edge control it said
+    "only 3.72 ... needs 1.64" in a single sentence. This is the §11.3 failure
+    again: prose composed for one branch and rendered on the other. The number
+    was right both times; the sentence around it was not.
+    """
+    expected_max = analysis.dsr.expected_max_sharpe_annual
     sigma = analysis.dsr.psr_result.standard_error_annual
-    over_point = analysis.winner_sharpe - analysis.dsr.expected_max_sharpe_annual
-    hurdle = (
-        f"The obvious bar to draw is the expected maximum of noise, "
-        f"{analysis.dsr.expected_max_sharpe_annual:.3f}, and it is the wrong one. That figure "
-        f"is a point estimate of a hurdle, while the winner's {analysis.winner_sharpe:.3f} is "
-        f"an estimate carrying a standard error of {sigma:.3f}. Clearing the point by "
-        f"{over_point:+.3f} is worth only {over_point / sigma:.2f} standard errors, where "
-        f"{DSR_THRESHOLD:.0%} confidence needs 1.64. The bar that follows is "
-        f"{analysis.dsr_hurdle:.3f}, which the winner "
+    over_point = analysis.winner_sharpe - expected_max
+    gap = analysis.winner_sharpe - analysis.dsr_hurdle
+
+    lead = (
+        f"The obvious bar to draw is the expected maximum of noise, {expected_max:.3f}, and "
+        f"it is not the bar the Deflated Sharpe Ratio applies. That figure is a point "
+        f"estimate of a hurdle, while the winner's {analysis.winner_sharpe:.3f} is an "
+        f"estimate carrying a standard error of {sigma:.3f}, so the bar that follows from "
+        f"it stands higher."
+    )
+
+    if over_point < 0.0:
+        margin = (
+            f"The winner does not reach even the point estimate, falling "
+            f"{abs(over_point):.3f} short of it — {abs(over_point) / sigma:.2f} standard "
+            f"errors the wrong way."
+        )
+    else:
+        enough = over_point / sigma >= _CONFIDENCE_Z
+        margin = (
+            f"Clearing the point by {over_point:+.3f} is worth "
+            f"{'' if enough else 'only '}{over_point / sigma:.2f} standard errors, "
+            f"{'and' if enough else 'where'} {DSR_THRESHOLD:.0%} confidence needs "
+            f"{_CONFIDENCE_Z:.2f}."
+        )
+
+    landing = (
+        f"That bar is {analysis.dsr_hurdle:.3f}, which the winner "
         f"{'misses' if gap < 0 else 'clears'} by {abs(gap):.3f} and which "
         f"{analysis.n_trials_above_hurdle} of {analysis.n_trials} variants reach."
     )
-    return {"search": search, "evidence": evidence, "hurdle": hurdle}
+
+    if gap >= 0.0:
+        # Nothing turns on the distinction here, and saying so is what stops the
+        # paragraph reading like an objection that was raised and then dropped.
+        consequence = (
+            "The winner clears both bars, so on this family the correction costs it nothing."
+        )
+    elif over_point >= 0.0:
+        consequence = (
+            "The winner sits between the two, which is why the choice of bar decides "
+            "this report."
+        )
+    else:
+        consequence = (
+            "The correction is not what decided this one: the winner was already below "
+            "the uncorrected bar."
+        )
+
+    return f"{lead} {margin} {landing} {consequence}"
 
 
 def _captions(analysis: Analysis) -> tuple[str, str]:

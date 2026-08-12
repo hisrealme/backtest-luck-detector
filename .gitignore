@@ -22,8 +22,14 @@ data/cache/
 outputs/
 *.html
 !src/luckdetector/report/templates/*.html
-docs/figures/*.png
-!docs/figures/.gitkeep
+# docs/figures/ is deliberately NOT ignored. outputs/ is, so the only way a
+# figure reaches someone who clones the repo is by being committed here, and a
+# README that links an uncommitted image renders as a broken image on GitHub.
+# Regenerate with `make figures`.
+
+# This prompt is a working note, not part of the artefact. Same reasoning that
+# keeps docs/HANDOFF.md out of the release, with more force.
+phase9_prompt.md
 
 # Notebooks
 .ipynb_checkpoints/

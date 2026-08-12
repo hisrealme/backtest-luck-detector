@@ -36,8 +36,11 @@ jobs:
       - name: Record resolved environment
         run: pip list --format=freeze
 
+      # Kept identical to `make lint`. When the two drift, the local gate stops
+      # predicting the remote one, and this project has already been bitten twice
+      # by trusting a green local run.
       - name: Lint
-        run: ruff check src tests
+        run: ruff check src tests scripts
 
       - name: Typecheck
         run: mypy

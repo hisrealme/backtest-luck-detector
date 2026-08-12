@@ -99,7 +99,7 @@ ignore = [
 # parse the PEP 695 `type` statements in numpy's own stubs when running under
 # 3.12, failing the matrix on a config lie rather than a real defect. Each matrix
 # job should typecheck against the interpreter it is actually running on.
-files = ["src/luckdetector"]
+files = ["src/luckdetector", "scripts"]
 strict = true
 warn_unreachable = true
 disallow_untyped_decorators = false

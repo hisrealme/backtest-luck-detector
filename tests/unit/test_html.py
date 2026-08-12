@@ -11,12 +11,23 @@ template edit cannot quietly become a second implementation.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from pathlib import Path
 
+import numpy as np
 import pytest
+from scipy import stats as sps
 
-from luckdetector.report.analysis import Analysis
-from luckdetector.report.html import CAVEATS, render_report, write_report
+from luckdetector.report.analysis import Analysis, analyse
+from luckdetector.report.html import (
+    _CONFIDENCE_Z,
+    CAVEATS,
+    _hurdle_paragraph,
+    render_report,
+    write_report,
+)
+from luckdetector.stats.dsr import DSR_THRESHOLD
+from luckdetector.types import TrialMatrix
 
 
 def evidence_table(document: str) -> str:
@@ -156,6 +167,74 @@ class TestEvidenceTable:
         """One accent per document, set on the article, so the rest can stay black."""
         assert '<article class="v-luck">' in document
         assert "--accent" in document
+
+
+class TestTheHurdleParagraphReadsCorrectlyBothWays:
+    """Section 3 is composed from signed differences, so every clause is branched.
+
+    Written after the paragraph was read on a family that *passes*, where the
+    version shipped in Phase 8 said — in one sentence — "is worth **only** 3.72
+    standard errors, where 95% confidence needs 1.64", and opened by calling the
+    expected maximum of noise "the wrong one" before declining to overturn
+    anything. Both numbers were right; the prose around them was written against
+    SPY and rendered on its opposite. That is §11.3's failure a second time, so
+    the three geometries are pinned here rather than left to be read by whoever
+    next runs the report on a winner that clears its bar.
+    """
+
+    @staticmethod
+    def geometry(analysis: Analysis) -> tuple[float, float]:
+        over_point = analysis.winner_sharpe - analysis.dsr.expected_max_sharpe_annual
+        return over_point, analysis.winner_sharpe - analysis.dsr_hurdle
+
+    def test_a_winner_between_the_two_bars_is_told_the_choice_decided_it(
+        self, luck_analysis: Analysis
+    ) -> None:
+        over_point, gap = self.geometry(luck_analysis)
+        assert over_point > 0 > gap, "fixture no longer reproduces the SPY geometry"
+        paragraph = _hurdle_paragraph(luck_analysis)
+        assert "only" in paragraph
+        assert "sits between the two" in paragraph
+        assert "misses" in paragraph
+
+    def test_a_winner_clearing_both_bars_is_never_told_it_did_so_only_just(
+        self, edge_analysis: Analysis
+    ) -> None:
+        """The contradiction this class exists for: "only 3.72 ... needs 1.64"."""
+        over_point, gap = self.geometry(edge_analysis)
+        assert over_point > 0 and gap > 0, "fixture no longer clears both bars"
+        paragraph = _hurdle_paragraph(edge_analysis)
+        assert "only" not in paragraph
+        assert "clears both bars" in paragraph
+        assert "costs it nothing" in paragraph
+
+    def test_a_winner_below_even_the_point_estimate_is_not_said_to_clear_it(
+        self, make_trials: Callable[..., np.ndarray]
+    ) -> None:
+        """Independent trials put the winner *below* the expected max of noise.
+
+        Mining produces correlated variants, which is what pushes the observed
+        maximum above the expected one; a matrix of genuinely independent trials
+        does the reverse. Without this case the paragraph would have rendered
+        "Clearing the point by -0.042" — a negative amount of clearing.
+        """
+        trials = TrialMatrix(
+            make_trials(0.0, n_trials=200, n=1260, offset=7),
+            periods_per_year=252,
+            labels=[f"noise_{i}" for i in range(200)],
+        )
+        analysis = analyse(trials, n_blocks=8, n_resamples=100, seed=1)
+        over_point, gap = self.geometry(analysis)
+        assert over_point < 0 and gap < 0, "200 independent trials no longer land below"
+        paragraph = _hurdle_paragraph(analysis)
+        assert "Clearing the point" not in paragraph
+        assert "does not reach even the point estimate" in paragraph
+        assert "already below the uncorrected bar" in paragraph
+
+    def test_the_confidence_quantile_is_not_a_hard_coded_1_64(self) -> None:
+        """It is quoted in prose beside DSR_THRESHOLD, so it has to follow it."""
+        assert pytest.approx(float(sps.norm.ppf(DSR_THRESHOLD))) == _CONFIDENCE_Z
+        assert f"{_CONFIDENCE_Z:.2f}" == "1.64"
 
 
 @pytest.fixture(scope="module")
