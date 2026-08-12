@@ -2,12 +2,12 @@
 
 **Blueprint v1.0 — as built, at v0.1.0**
 
-Sections 0–9 are the plan, kept as written so the amendments in §6a stay legible.
-Sections 10–12 are the working record that used to live in a separate
-`HANDOFF.md`: the decisions already settled, the limitations already measured,
-and the two environment traps that have each cost the project a day. That file
-was for building; this one is for reading, and keeping two of them meant the
-reasoning lived in the wrong place.
+The design, the specification and the record of what was decided, in one document.
+Sections 0–9 are the plan, kept as written so the amendments in §6a stay legible;
+§5.7 covers the verdict layer and says which of its numbers are conventions and
+which are judgements. Sections 10–12 are what the build turned up: the decisions
+already settled, the limitations already measured, and the two environment traps
+that have each cost the project a day.
 
 ---
 
@@ -101,7 +101,6 @@ backtest-luck-detector/
 │
 └── docs/
     ├── BLUEPRINT.md              # this file
-    ├── METHODS.md                # the maths, with citations
     └── figures/
         ├── cumulative_return.png # committed: outputs/ is gitignored, so a
         └── deflation_hurdle.png  # README figure has nowhere else to live
@@ -149,7 +148,7 @@ The two entry points map to the two things a user can hand us:
 
 ## 5. The statistics — specification
 
-Full derivations live in `docs/METHODS.md`. Implementation contract summarised here.
+Implementation contract summarised here; §5.7 covers the verdict rules.
 
 ### 5.1 Probabilistic Sharpe Ratio (Bailey & López de Prado 2012)
 
@@ -258,6 +257,73 @@ trials would have scored 0.31, and you scored 0.49.*
 Kept in this document rather than deleted so the reasoning survives the decision. See
 §6 for what replaced the phase.
 
+### 5.7 The verdict rules, and which numbers are invented
+
+Every statistic above comes from a published result and is checked against
+simulation. **The rules that combine them are not**, and this section says so before a
+reader has to. There is no literature on weighing a Deflated Sharpe Ratio against a PBO
+against an SPA p-value, because the question is one of judgement rather than of
+mathematics.
+
+**No composite score.** A weighted average of four statistics would look more
+sophisticated and be less honest: it would hide which evidence drove the answer, and let
+two mild concerns average into a clean bill of health. Each test raises its own flag, a
+rule table short enough to read combines them, and the verdict records which rule fired.
+Evaluated in order, first match wins; the last is a catch-all, so exactly one always
+fires.
+
+| rule | verdict | when |
+|---|---|---|
+| `no-evidence` | INCONCLUSIVE | no test could be run at all |
+| `record-too-short` | INCONCLUSIVE | PSR is the *only* test that flagged |
+| `flagged` | LIKELY_LUCK | any selection-aware test flagged |
+| `psr-only` | INCONCLUSIVE | nothing flagged, but only PSR was available |
+| `clean` | LIKELY_SKILL | nothing flagged, and a selection-aware test ran |
+
+**PSR is a precondition, not a fourth vote.** It knows the length of the record and
+nothing about how many strategies were tried to find it — it is the naive test this
+package exists to debunk, and the SPY winner clears it at 0.9764 while failing everything
+that knows a search took place. So a lone PSR flag means *we cannot tell yet* rather than
+*luck*, and LIKELY_SKILL requires at least one of DSR, PBO or SPA to have run and passed.
+
+**One flag is enough for LIKELY_LUCK.** Counting or averaging would treat the tests as
+interchangeable measurements of one quantity, and they are not: DSR prices multiplicity,
+PBO prices selection stability, SPA prices the benchmark, and each can be the only one
+positioned to see a given failure. The cost is worth naming — **the layer is asymmetric,
+deliberately.** It is much easier to be told your backtest is luck than that it is skill.
+For a tool built to resist a flattering answer that is the right way round, but it makes
+LIKELY_LUCK a weaker claim than LIKELY_SKILL, and the narrative names the specific flag
+rather than implying a consensus.
+
+**`TestResult` has three states, not two.** Against buy-and-hold the SPY grid returns an
+SPA p-value of exactly 1.0000 — not because the test looked and found nothing, but
+because not one of the 157 variants beat the benchmark, so the statistic is max(0, ·) = 0
+and no resample can fall below it. Scored as a flag that is the most decisive rejection
+in the report; scored as a pass it is nonsense. `NOT_APPLICABLE` neither flags nor counts
+toward the evidence LIKELY_SKILL requires, and the finding moves into the interpretation
+string where it belongs.
+
+Which of the numbers are conventions and which are judgements:
+
+| constant | value | status |
+|---|---|---|
+| `PSR_THRESHOLD` | 0.95 | convention — one-sided 95% |
+| `DSR_THRESHOLD` | 0.95 | convention — DSR is a probability |
+| `SIGNIFICANCE_LEVEL` | 0.05 | convention |
+| `PBO_THRESHOLD` | 0.2 | **invented.** Bailey et al. propose no cutoff |
+| the rule table itself | — | **invented.** Precedence, asymmetry and the PSR carve-out are all judgement |
+
+Three of the four thresholds are conventional. **The invented part is the combination
+logic**, and that is where a sceptical reader should push.
+
+**Does it matter? Measured, not asserted.** The SPY luck verdict is robust: DSR returns
+0.7692 so it flags for any bar above 0.77, PBO returns 0.8396 so it flags for any bar
+below 0.84, and one flag suffices — both would have to be moved implausibly far, and
+simultaneously, to change the answer. No threshold anyone would defend produces a
+different verdict. The skill side is not robust, and §11 carries the measured detection
+rates. The one direction that *is* reliable: across 20 independent zero-edge families the
+verdict is never LIKELY_SKILL. The tool does not manufacture skill; it fails to find it.
+
 ## 6. Phase plan
 
 Each phase ends with green tests and one commit. Nothing moves forward on red.
@@ -274,16 +340,16 @@ Phase 9 rather than Phase 12. See §6a for what was cut and why.
 | 4 | Mining engine | `mining/` | 500-strategy grid on SPY in < 10 s; vectorised output matches a naive loop |
 | 5 | PBO / CSCV | `stats/pbo.py` | PBO ≈ 0.5 on synthetic noise; PBO < 0.1 on synthetic true-edge data |
 | 6 | RC / SPA | `stats/reality_check.py` | p-values ~Uniform(0,1) under the null (KS test passes); SPA ≥ RC power on a planted edge |
-| 7 | Verdict | `report/verdict.py` | Rule table unit-tested at every boundary; thresholds named as constants and defended in METHODS |
+| 7 | Verdict | `report/verdict.py` | Rule table unit-tested at every boundary; thresholds named as constants and defended in §5.7 |
 | 8 | Report + CLI | `report/plots.py`, `report/html.py`, `cli.py` | `luckdet demo` runs end-to-end from a clean install; single self-contained HTML; two figures, snapshot-tested |
-| 9 | Docs + publish | README, METHODS, notebook | Repo is legible to a stranger in 60 seconds; v0.1.0 tagged and pushed |
+| 9 | Docs + publish | README, notebook, release | Repo is legible to a stranger in 60 seconds; v0.1.0 tagged and pushed |
 
 **All ten are done.** v0.1.0 is the tag on Phase 9. Phase 9 itself: the two
 figures generated from real SPY prices and committed to `docs/figures/`, the
 README restructured so the verdict and both figures are above the fold, the
 quickstart notebook in `examples/`, the working handoff folded into §10–§12 of
 this document and deleted, and section 3 of the generated report fixed after it
-was read on a family that passes (`METHODS.md` §12.2).
+was read on a family that passes.
 
 Power curves for each statistic are folded into `tests/unit/` alongside the
 calibration tests that already live there, marked `slow`. They are not a phase.
@@ -321,7 +387,7 @@ mostly wiring, and it is the same work as making the report render.
 
 **Kept deliberately, despite being the weakest link:** the verdict layer. A tool that
 returns five numbers and no answer is unfinished. But its thresholds are invented
-rather than derived, and that should be said out loud in METHODS before a reader says
+rather than derived, and that is said out loud in §5.7 before a reader says
 it first. `PBO_THRESHOLD = 0.2` already sets the precedent: a named constant with an
 explicit note that it is a judgement call, not a convention from the literature.
 
@@ -356,8 +422,8 @@ That last step is the difference between a project that looks rigorous and one t
 - Every statistical routine has a null-calibration test in `tests/unit/`, checked
   against simulation rather than against a re-transcription of its own formula.
 - README opens with the demo result and a figure, not with installation instructions.
-- `docs/METHODS.md` cites every paper implemented, and states plainly where a
-  threshold is a judgement call rather than a convention.
+- §13 cites every paper implemented, and §5.7 states plainly where a threshold is a
+  judgement call rather than a convention.
 
 ## 10. Decisions already settled — do not re-open without a measurement
 
@@ -376,8 +442,9 @@ significance by ~16× on daily data and is the classic bug in this literature.
 network. Any *reported result* uses real prices. `synthetic_prices()` is honestly
 named and never dressed up as a ticker. **No market data is committed to this
 repository** — which is a constraint on the README, the notebook and the report
-as much as on the test suite, and §12.1 of `METHODS.md` records how each one
-lives within it.
+as much as on the test suite. The notebook resolves prices the way `luckdet demo`
+does and ships executed, so it reads without being run; the two README figures are
+committed to `docs/figures/` because there is nowhere else they could live.
 
 **Keep every trial, never just the winner.** `mine()` returns the whole family.
 PBO and Reality Check are impossible without it.
@@ -493,7 +560,7 @@ pip ≥ 21.3.
 gitignored: real prices stay local and stay available for analysis without
 re-downloading, while nothing generated there reaches a reader who clones the
 repo. That is why the two README figures are committed to `docs/figures/` and why
-the reported numbers live in `README.md` and `docs/METHODS.md`. `luckdet demo`
+the reported numbers live in `README.md`. `luckdet demo`
 searches `outputs/` before the user cache, so running it from the repo root picks
 up that CSV and needs no network.
 
@@ -506,7 +573,7 @@ failure that passed on the 3.10 job and failed on the other four, because
 matplotlib 3.11 dropped Python 3.10 — 3.10 resolves matplotlib 3.10.9 with a
 loose signature while 3.11+ resolve 3.11.1 with a strict one. numpy splits the
 same way: numpy 2.3 requires 3.11+, so a 3.10 environment never typechecks
-against the newer stubs. `METHODS.md` §11.5 has the full account. The rule it
+against the newer stubs. The rule it
 implies: **where a dependency's stubs vary across the supported range, prefer the
 form that lets the dependency's own types do the checking over the form that
 asserts a type of your own.** And run `make check` locally before pushing, then

@@ -114,14 +114,14 @@ rule with a 250-day lookback is contaminated near each seam. That makes the winn
 *more* persistent than it is, which means the true probability of overfitting is likely
 worse than the 0.84 reported.
 
-**A luck verdict is weak evidence of absence.** [`METHODS.md`](docs/METHODS.md) §9
-measures how cautious this thing is rather than leaving you to find out: a real, persistent
-Sharpe of 2.0 in 10 of 50 variants over five years gets recognised as skill only about one
-time in five. It's much better at catching luck than at certifying skill, and that
-asymmetry is deliberate.
+**A luck verdict is weak evidence of absence.** [`BLUEPRINT.md`](docs/BLUEPRINT.md) §11
+measures how cautious this thing is rather than leaving you to find out: a real,
+persistent Sharpe of 2.0 in 10 of 50 variants over five years gets recognised as skill
+only about one time in five. It's much better at catching luck than at certifying skill,
+and that asymmetry is deliberate.
 
 The rule table that turns four statistics into one label is a judgement too, not a
-published result. [`METHODS.md`](docs/METHODS.md) §9 says which of the numbers are
+published result. [`BLUEPRINT.md`](docs/BLUEPRINT.md) §5.7 says which of the numbers are
 conventional and which were invented here.
 
 ## Install
@@ -204,7 +204,7 @@ SPY those two answers are p = 0.24 and p = 1.00.
 
 Every argument to `assess` is optional, and a missing test never counts as a passing one —
 if a verdict rests on less evidence, it says so. The thresholds and the combination rules
-are laid out, and argued with, in [`METHODS.md`](docs/METHODS.md) §9.
+are laid out, and argued with, in [`BLUEPRINT.md`](docs/BLUEPRINT.md) §5.7.
 
 `luckdet demo` runs the machinery twice: on real prices, where it returns
 **LIKELY_LUCK**, then on a family with a genuine edge planted in it, where it returns
@@ -230,10 +230,9 @@ won't quietly swap a random number generator in for a market.
 
 ## Documentation
 
-- [`docs/METHODS.md`](docs/METHODS.md) — the mathematics, with citations, and a plainly
-  marked list of every place a threshold is a judgement call rather than a convention.
-- [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md) — the design, the decisions that are settled,
-  and the limitations that are measured.
+- [`docs/BLUEPRINT.md`](docs/BLUEPRINT.md) — the design and the specification: what each
+  statistic computes, which thresholds are conventions and which are judgements (§5.7),
+  the decisions that are settled, and the limitations that are measured.
 - [`examples/01_quickstart.ipynb`](examples/01_quickstart.ipynb) — the SPY result end to
   end, shipped with its outputs so it reads without being run.
 

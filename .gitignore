@@ -18,18 +18,14 @@ htmlcov/
 
 # Project artefacts
 .cache/
-data/cache/
 outputs/
 *.html
-!src/luckdetector/report/templates/*.html
-# docs/figures/ is deliberately NOT ignored. outputs/ is, so the only way a
-# figure reaches someone who clones the repo is by being committed here, and a
-# README that links an uncommitted image renders as a broken image on GitHub.
-# Regenerate with `make figures`.
 
-# This prompt is a working note, not part of the artefact. Same reasoning that
-# keeps docs/HANDOFF.md out of the release, with more force.
-phase9_prompt.md
+# docs/ is private by default: working notes live here and are not part of the
+# artefact, so only what is explicitly published ships. Naming an ignored file
+# would defeat the point of not shipping it.
+docs/*.md
+!docs/BLUEPRINT.md
 
 # Notebooks
 .ipynb_checkpoints/

@@ -38,8 +38,8 @@ import pytest
 
 NOTEBOOK = Path(__file__).resolve().parents[2] / "examples" / "01_quickstart.ipynb"
 
-#: Every figure the README and `docs/METHODS.md` §10 quote for the SPY run. The
-#: notebook recomputes them; this asserts it still lands on the same ones.
+#: Every figure the README quotes for the SPY run. The notebook recomputes
+#: them; this asserts it still lands on the same ones.
 PUBLISHED: tuple[str, ...] = (
     "MA(80,250)",
     "0.491",  # winner's annualised Sharpe
